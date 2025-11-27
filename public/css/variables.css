@@ -24,16 +24,20 @@
     --text-tertiary: #D2D2D7;
 
     /* --- Glassmorphism --- */
-    --glass-base: rgba(255, 255, 255, 0.25);
+    --glass-base: rgba(255, 255, 255, 0.65);
+    /* Slightly more opaque for readability */
     --glass-highlight: rgba(255, 255, 255, 0.4);
-    --glass-border: rgba(255, 255, 255, 0.45);
+    --glass-border: rgba(255, 255, 255, 0.5);
     --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
-    --glass-blur: blur(40px);
+    --glass-blur: blur(20px);
     --glass-radius: 24px;
 
-    /* --- Physics --- */
+    /* --- Motion System (Apple-like) --- */
     --ease-ios: cubic-bezier(0.25, 1, 0.5, 1);
-    --ease-fluid: cubic-bezier(0.4, 0.0, 0.2, 1);
+    --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --duration-micro: 120ms;
+    --duration-std: 250ms;
+    --duration-long: 400ms;
 }
 
 /* --- LOVE MODE OVERRIDES --- */
@@ -52,7 +56,7 @@ body.mode-love {
     /* Passion Red */
     --accent-glow: rgba(255, 90, 95, 0.4);
 
-    --glass-base: rgba(255, 240, 245, 0.35);
+    --glass-base: rgba(255, 245, 247, 0.7);
     /* Pinkish Glass */
     --glass-border: rgba(255, 255, 255, 0.6);
     --text-primary: #4A2C2C;

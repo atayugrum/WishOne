@@ -1,4 +1,5 @@
 import { authService } from '../services/AuthService.js';
+import { premiumModal } from './PremiumModal.js';
 
 export class AdSlot {
     constructor() {
@@ -8,20 +9,23 @@ export class AdSlot {
     }
 
     render() {
+        // Don't render for Premium users
+        if (authService.isPremium) {
+            this.element.style.display = 'none';
+            return;
+        }
+
         this.element.innerHTML = `
-            <div class="ad-content">
+            <div class="ad-content" style="cursor: pointer;">
                 <span class="ad-badge">Sponsored</span>
                 <h3>Upgrade to Premium</h3>
-                <p>Remove ads and unlock unlimited combos!</p>
-                <button class="btn-primary btn-sm" id="btn-upgrade">Remove Ads</button>
+                <p>Remove ads and unlock unlimited AI tools & price tracking!</p>
+                <div style="margin-top:8px; font-weight:bold; color:var(--accent-color);">Tap to Upgrade →</div>
             </div>
         `;
 
-        this.element.querySelector('#btn-upgrade').addEventListener('click', async () => {
-            if (confirm("Upgrade to Premium for $4.99?")) {
-                await authService.upgradeToPremium();
-                window.location.reload(); // Simple reload to reflect changes
-            }
+        this.element.addEventListener('click', () => {
+            premiumModal.open();
         });
     }
 

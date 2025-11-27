@@ -1,4 +1,3 @@
-// js/services/AuthService.js
 import { auth, googleProvider, db } from '../config/firebase-config.js';
 import {
     signInWithPopup,
@@ -8,7 +7,8 @@ import {
     signInWithEmailAndPassword,
     updateProfile
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { FEATURE_LIMITS } from '../config/limits.js';
 
 export class AuthService {
     constructor() {
@@ -38,17 +38,14 @@ export class AuthService {
 
     async registerWithEmail(email, password, fullName) {
         try {
-            // 1. Create Auth User
             const result = await createUserWithEmailAndPassword(auth, email, password);
             const user = result.user;
 
-            // 2. Update Auth Profile (Display Name)
             await updateProfile(user, {
                 displayName: fullName,
                 photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`
             });
 
-            // The init() listener will detect this and create the Firestore profile
             return user;
         } catch (error) {
             console.error("Registration failed:", error);
@@ -60,6 +57,7 @@ export class AuthService {
         await signOut(auth);
         this.currentUser = null;
         this.userProfile = null;
+        localStorage.clear(); // Clear usage logs on logout
     }
 
     init(callback) {
@@ -74,7 +72,6 @@ export class AuthService {
                     this.userProfile = snapshot.data();
                 } else {
                     console.log("Creating new user profile...");
-                    // Basic heuristic for default username
                     const baseUsername = user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
                     const displayName = user.displayName || 'User';
 
@@ -110,8 +107,48 @@ export class AuthService {
     async upgradeToPremium() {
         if (!this.currentUser) return;
         const userRef = doc(db, "users", this.currentUser.uid);
-        await setDoc(userRef, { plan: 'premium' }, { merge: true });
-        if (this.userProfile) this.userProfile.plan = 'premium';
+        // Mock Payment Success
+        await updateDoc(userRef, {
+            plan: 'premium',
+            planSince: new Date()
+        });
+        if (this.userProfile) {
+            this.userProfile.plan = 'premium';
+        }
+    }
+
+    // --- USAGE LIMITS ---
+
+    _getUsageKey(feature) {
+        const today = new Date().toISOString().split('T')[0];
+        return `limit_${feature}_${this.currentUser?.uid}_${today}`;
+    }
+
+    canUseFeature(feature) {
+        if (this.isPremium) return true;
+
+        const key = this._getUsageKey(feature);
+        const count = parseInt(localStorage.getItem(key) || '0');
+        const limit = FEATURE_LIMITS[feature.toUpperCase()] || 0;
+
+        return count < limit;
+    }
+
+    trackFeatureUsage(feature) {
+        if (this.isPremium) return;
+
+        const key = this._getUsageKey(feature);
+        const count = parseInt(localStorage.getItem(key) || '0');
+        localStorage.setItem(key, count + 1);
+        console.log(`tracked usage for ${feature}: ${count + 1}`);
+    }
+
+    getRemainingUsage(feature) {
+        if (this.isPremium) return Infinity;
+        const key = this._getUsageKey(feature);
+        const count = parseInt(localStorage.getItem(key) || '0');
+        const limit = FEATURE_LIMITS[feature.toUpperCase()] || 0;
+        return Math.max(0, limit - count);
     }
 }
 

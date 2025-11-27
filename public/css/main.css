@@ -6,7 +6,7 @@
     margin: 0;
     padding: 0;
     -webkit-font-smoothing: antialiased;
-    /* Critical for "Apple" look */
+    -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -14,12 +14,12 @@ body {
     color: var(--text-primary);
     min-height: 100vh;
     overflow-x: hidden;
-    /* Create the background canvas */
     background: white;
+    /* Fallback */
+    transition: background 1s var(--ease-ios);
 }
 
 /* --- The Ambient Background Mesh --- */
-/* Creates the slow, meditative color morph */
 .ambient-background {
     position: fixed;
     top: -50%;
@@ -31,11 +31,12 @@ body {
         radial-gradient(at top right, var(--bg-color-2), transparent 50%),
         radial-gradient(at bottom left, var(--bg-color-3), transparent 50%),
         radial-gradient(at bottom right, var(--bg-color-4), transparent 50%);
-    filter: blur(100px);
-    /* Extreme blur mixes colors smoothly */
+    filter: blur(80px);
     animation: gradientFlow 25s infinite alternate var(--ease-fluid);
     opacity: 0.8;
-    transition: background 2s ease-in-out;
+    transition: background 1s var(--ease-ios);
+    /* Smooth Love Mode switch */
+    will-change: transform;
 }
 
 @keyframes gradientFlow {
@@ -48,35 +49,32 @@ body {
     }
 }
 
-/* --- App Container --- */
+/* --- App Container & Layout --- */
 #app {
     position: relative;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 120px 20px 40px;
-    /* Top padding leaves room for floating header */
-    transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+    padding: 120px 20px 60px;
     opacity: 1;
-    transform: translateY(0);
 }
 
-/* --- Text Styles --- */
+/* --- Typography --- */
 h1,
 h2,
 h3 {
     font-family: var(--font-display);
     letter-spacing: -0.02em;
-    /* Tighter headings look more modern */
+    color: var(--text-primary);
 }
 
 h1 {
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 0.5rem;
-    background: linear-gradient(135deg, var(--text-primary) 0%, #555 100%);
+    background: linear-gradient(135deg, var(--text-primary) 0%, #666 100%);
     background-clip: text;
     -webkit-text-fill-color: transparent;
-    /* Subtle gradient on text */
+    transition: all 0.3s var(--ease-ios);
 }
 
 p {
@@ -84,32 +82,46 @@ p {
     color: var(--text-secondary);
 }
 
-/* View Transitions */
+/* --- View Transitions --- */
+/* Exit: Fade out + Scale down slightly */
 .view-exit {
     opacity: 0;
-    transform: translateY(10px);
+    transform: scale(0.98) translateY(-10px);
+    transition: opacity 0.2s var(--ease-ios), transform 0.2s var(--ease-ios);
+    pointer-events: none;
 }
 
+/* Enter: Fade in + Slide up */
 .view-enter {
-    animation: fadeUp 0.3s ease-out forwards;
+    animation: fadeSlideUp var(--duration-std) var(--ease-ios) forwards;
 }
 
-@keyframes fadeUp {
+@keyframes fadeSlideUp {
     from {
         opacity: 0;
-        transform: translateY(10px);
+        transform: translateY(20px) scale(0.98);
     }
 
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
+}
+
+/* --- Interactive Elements --- */
+button,
+.clickable {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* Header Specifics */
 .nav-pills {
     display: flex;
     gap: 8px;
+    background: rgba(255, 255, 255, 0.3);
+    padding: 4px;
+    border-radius: 100px;
 }
 
 .nav-link {
@@ -119,14 +131,19 @@ p {
     border-radius: 20px;
     font-size: 0.9rem;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: all var(--duration-micro) var(--ease-ios);
 }
 
 .nav-link.active {
-    background: rgba(0, 0, 0, 0.05);
-    /* Very subtle */
+    background: white;
     color: var(--text-primary);
     font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.nav-link:hover:not(.active) {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.5);
 }
 
 .icon-btn {
@@ -135,7 +152,12 @@ p {
     font-size: 1.2rem;
     cursor: pointer;
     padding: 8px;
-    transition: transform 0.2s;
+    border-radius: 50%;
+    transition: transform var(--duration-spring), background 0.2s;
+}
+
+.icon-btn:active {
+    transform: scale(0.9);
 }
 
 .user-avatar img {
@@ -143,21 +165,18 @@ p {
     height: 32px;
     border-radius: 50%;
     border: 2px solid white;
+    transition: border-color 0.2s;
 }
 
 /* Masonry Grid */
 .masonry-grid {
     display: block;
-    /* Stop forcing rows */
     column-count: 4;
-    /* Start with 4 columns */
     column-gap: 24px;
-    /* Space between columns */
     width: 100%;
     padding-bottom: 100px;
 }
 
-/* Responsive: Show fewer columns on smaller screens */
 @media (max-width: 1200px) {
     .masonry-grid {
         column-count: 3;
@@ -176,37 +195,15 @@ p {
     }
 }
 
-/* Love Mode Rain */
-body.mode-love::after {
-    content: "❤️ 🧡 💖 💗 ❤️ 💖";
-    /* The rain drops */
-    position: fixed;
-    top: -10vh;
-    left: 0;
-    width: 100%;
-    height: 120vh;
-    z-index: -1;
-    /* Behind glass cards, in front of background gradient */
-    font-size: 2rem;
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
 
-    /* This spreads the emojis out across the screen */
-    letter-spacing: 15vw;
-    text-align: center;
-    line-height: 200px;
-
-    opacity: 0.4;
-    animation: loveRain 10s linear infinite;
-    pointer-events: none;
-    /* Let clicks pass through */
-    text-shadow: 0 0 10px rgba(255, 182, 193, 0.5);
-}
-
-@keyframes loveRain {
-    0% {
-        transform: translateY(-20vh) rotate(0deg);
-    }
-
-    100% {
-        transform: translateY(100vh) rotate(10deg);
+    *,
+    ::before,
+    ::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
     }
 }
