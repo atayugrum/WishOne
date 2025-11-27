@@ -30,7 +30,6 @@ export class Header {
             </nav>
 
             <div class="header-actions">
-                <!-- LANGUAGE TOGGLE -->
                 <button id="toggle-lang" class="btn-text" style="font-size: 0.8rem; font-weight: 700;">
                     ${currentLang}
                 </button>
@@ -62,11 +61,12 @@ export class Header {
             });
         });
 
-        // 4. Logout
+        // 4. Profile Navigation (UPDATED)
         const authContainer = this.element.querySelector('#auth-container');
-        authContainer.addEventListener('click', async (e) => {
+        authContainer.addEventListener('click', (e) => {
             if (e.target.closest('.user-avatar')) {
-                if (confirm("Log out?")) await authService.logout();
+                // Navigate to Profile Settings instead of logging out
+                window.location.hash = '#/profile';
             }
         });
     }

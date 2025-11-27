@@ -8,12 +8,13 @@ import { i18n } from '../services/LocalizationService.js';
 
 let addItemModal = null;
 let currentView = 'grid'; // State: 'grid' or 'timeline'
+let itemsMap = new Map(); // Store items for quick lookup
 
-// Helper: Days Left
+// Helper: Days Left (same as before)
 function getCountdown(dateString) {
     if (!dateString) return null;
     const target = new Date(dateString);
-    if (isNaN(target.getTime())) return null; // Handle Invalid Date
+    if (isNaN(target.getTime())) return null;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -26,7 +27,6 @@ function getCountdown(dateString) {
     if (diffDays <= 7) return { text: `${diffDays} days left`, class: "tag-urgent", days: diffDays };
     if (diffDays <= 30) return { text: `${diffDays} days left`, class: "tag-soon", days: diffDays };
 
-    // Better Month Logic
     const months = Math.round(diffDays / 30);
     if (months <= 1) return { text: "Next Month", class: "tag-far", days: diffDays };
     if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} years`, class: "tag-far", days: diffDays };
@@ -52,6 +52,7 @@ export const HomeView = {
     render: async () => {
         if (!addItemModal) addItemModal = new AddItemModal(() => HomeView.loadData());
 
+        // Global Handlers
         window.openAddModal = () => addItemModal.open();
 
         window.handleDeleteItem = async (itemId) => {
@@ -60,6 +61,13 @@ export const HomeView = {
                 if (card) { card.style.transform = 'scale(0.9)'; card.style.opacity = '0'; }
                 await firestoreService.deleteItem(itemId);
                 HomeView.loadData();
+            }
+        };
+
+        window.handleEditItem = (itemId) => {
+            const item = itemsMap.get(itemId);
+            if (item) {
+                addItemModal.open(item);
             }
         };
 
@@ -76,15 +84,102 @@ export const HomeView = {
         window.setView = (mode) => {
             currentView = mode;
             HomeView.loadData();
-            // Update buttons visually
             document.querySelectorAll('.toggle-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById(`btn-${mode}`).classList.add('active');
+        };
+
+        // NEW: AI Planner Handler
+        window.openPlannerModal = () => {
+            const modal = document.getElementById('planner-modal');
+            if (modal) modal.classList.add('active');
+        };
+
+        window.handleAiPlannerSubmit = async () => {
+            console.log("AI Planner Submit Clicked"); // DEBUG
+
+            // Free vs Premium Check
+            if (!authService.isPremium) {
+                const usage = parseInt(sessionStorage.getItem('ai_planner_usage') || '0');
+                if (usage >= 1) {
+                    alert("Unlimited AI purchase planning is available with Premium.");
+                    return;
+                }
+                sessionStorage.setItem('ai_planner_usage', usage + 1);
+            }
+
+            const budgetInput = document.getElementById('planner-budget');
+            const resultsDiv = document.getElementById('planner-results');
+            const budget = parseFloat(budgetInput.value);
+
+            if (!budget || budget <= 0) return alert("Please enter a valid budget.");
+
+            resultsDiv.innerHTML = `<div class="loading-spinner">Analyzing your wishlist... 🧠</div>`;
+
+            try {
+                const wishlistItems = await firestoreService.getWishlist(authService.currentUser.uid);
+                console.log("Wishlist items found:", wishlistItems.length); // DEBUG
+
+                if (wishlistItems.length === 0) {
+                    resultsDiv.innerHTML = `<p style="text-align:center;">Your wishlist is empty! Add items first.</p>`;
+                    return;
+                }
+
+                console.log("Sending request to AI Planner endpoint..."); // DEBUG
+                const response = await fetch('http://localhost:3001/api/ai/purchase-planner', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        wishlistItems,
+                        budget,
+                        currency: 'TRY' // Defaulting to TRY for now as per context
+                    })
+                });
+
+                console.log("AI Planner Response status:", response.status); // DEBUG
+
+                if (!response.ok) {
+                    throw new Error(`Server Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                console.log("AI Planner Data received:", data); // DEBUG
+
+                if (data.recommendedItems) {
+                    const itemsHtml = data.recommendedItems.map(rec => {
+                        const item = wishlistItems.find(i => i.id === rec.itemId);
+                        if (!item) return '';
+                        return `
+                            <div class="glass-panel" style="padding:12px; margin-bottom:8px; display:flex; gap:12px; align-items:center;">
+                                <img src="${item.imageUrl || 'https://placehold.co/600x400'}" style="width:50px; height:50px; border-radius:8px; object-fit:cover;">
+                                <div>
+                                    <div style="font-weight:bold;">${item.title}</div>
+                                    <div style="font-size:0.85rem; color:var(--text-secondary);">${rec.reason}</div>
+                                    <div style="font-weight:bold; color:var(--accent-color);">${item.price} ${item.currency}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    resultsDiv.innerHTML = `
+                        <div style="margin-bottom:16px; padding:12px; background:rgba(255,255,255,0.5); border-radius:12px;">
+                            <strong>Summary:</strong> ${data.summary}
+                        </div>
+                        ${itemsHtml}
+                        ${data.weeklySavingHint ? `<div class="savings-hint" style="margin-top:12px;">💡 ${data.weeklySavingHint}</div>` : ''}
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `<p>Could not generate a plan. Try adjusting your budget.</p>`;
+                }
+
+            } catch (error) {
+                console.error("AI Planner Error:", error);
+                resultsDiv.innerHTML = `<p style="color:red;">Error: ${error.message}</p>`;
+            }
         };
 
         setTimeout(() => HomeView.loadData(), 0);
 
         return `
-            <!-- Side Banners (Desktop Only) -->
             ${!authService.isPremium ? `
                 <div class="ad-side-banner left">
                     <span class="ad-badge">Sponsored</span>
@@ -105,14 +200,13 @@ export const HomeView = {
                     <p>${i18n.t('home.subtitle')}</p>
                 </div>
                 
-                <!-- NEW: View Toggle -->
                 <div class="view-toggle">
+                    <button class="btn-magic" onclick="window.openPlannerModal()" style="margin-right:12px; font-size:0.9rem;">💰 AI Planner</button>
                     <button id="btn-grid" class="toggle-btn active" onclick="window.setView('grid')" title="Grid View">⊞</button>
                     <button id="btn-timeline" class="toggle-btn" onclick="window.setView('timeline')" title="Timeline View">☰</button>
                 </div>
             </div>
 
-            <!-- Financial Dashboard -->
             <div id="finance-dashboard" class="glass-panel dashboard-widget" style="display:none;">
                  <div class="stat-box">
                     <span class="stat-label">${i18n.t('dashboard.wishes')}</span>
@@ -136,7 +230,6 @@ export const HomeView = {
                  </div>
             </div>
 
-            <!-- Content Area -->
             <div id="content-area">
                 <div class="masonry-grid">
                     ${HomeView.skeletonTemplate.repeat(4)}
@@ -144,6 +237,26 @@ export const HomeView = {
             </div>
             
             <button class="fab-add" onclick="window.openAddModal()">+</button>
+
+            <!-- AI Planner Modal -->
+            <div id="planner-modal" class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2>AI Purchase Planner</h2>
+                        <button class="close-btn" onclick="document.getElementById('planner-modal').classList.remove('active')">&times;</button>
+                    </div>
+                    <div class="form-group">
+                        <label>What is your budget?</label>
+                        <div class="input-with-icon">
+                            <span class="input-icon">💰</span>
+                            <input type="number" id="planner-budget" placeholder="e.g. 5000">
+                        </div>
+                    </div>
+                    <button class="btn-primary" style="width:100%;" onclick="window.handleAiPlannerSubmit()">Generate Plan</button>
+                    
+                    <div id="planner-results" style="margin-top:24px;"></div>
+                </div>
+            </div>
         `;
     },
 
@@ -164,6 +277,10 @@ export const HomeView = {
                 firestoreService.getWishlist(user.uid),
                 firestoreService.getCloset(user.uid)
             ]);
+
+            // Populate Map for Edits
+            itemsMap.clear();
+            items.forEach(item => itemsMap.set(item.id, item));
 
             // Update Dashboard
             let totalValueTRY = 0;
@@ -231,7 +348,8 @@ export const HomeView = {
         let savingsText = '';
 
         if (timeData) {
-            timeBadge = `<div class="card-overlay-badge"><span class="time-tag ${timeData.class}">⏳ ${timeData.text}</span></div>`;
+            // Changed: Removed card-overlay-badge wrapper, added margin for inline display
+            timeBadge = `<div style="margin-bottom: 8px;"><span class="time-tag ${timeData.class}" style="display: inline-flex;">⏳ ${timeData.text}</span></div>`;
             if (item.price > 0 && timeData.days > 0) {
                 const weekly = getWeeklySavings(item.price, timeData.days);
                 if (weekly > 0) {
@@ -241,30 +359,37 @@ export const HomeView = {
             }
         }
 
-        // Discount Badge Logic
         let discountBadge = '';
+        let priceDisplay = `<span class="price">${item.price} ${item.currency}</span>`;
+
         if (item.onSale && item.originalPrice && item.price < item.originalPrice) {
             const discount = Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100);
             if (discount > 0) {
                 discountBadge = `<div class="discount-badge">-${discount}%</div>`;
             }
+            priceDisplay = `
+                <span class="original-price" style="text-decoration: line-through; color: var(--text-secondary); font-size: 0.9em; margin-right: 6px;">${item.originalPrice}</span>
+                <span class="price sale-price" style="color: var(--accent-color); font-weight: bold;">${item.price} ${item.currency}</span>
+            `;
         }
 
         return `
             <article class="glass-panel card" data-id="${item.id}">
-                <button class="card-action-btn delete-btn" onclick="window.handleDeleteItem('${item.id}')">&times;</button>
-                <button class="card-action-btn closet-btn" onclick="window.handleMoveToCloset('${item.id}')">✔</button>
+                <button class="card-action-btn delete-btn" onclick="window.handleDeleteItem('${item.id}')" title="Delete">&times;</button>
+                <button class="card-action-btn edit-btn" onclick="window.handleEditItem('${item.id}')" title="Edit">✎</button>
+                <button class="card-action-btn closet-btn" onclick="window.handleMoveToCloset('${item.id}')" title="Moved to Closet">✔</button>
+                
                 <div class="card-img-container">
-                    ${timeBadge}
                     ${discountBadge}
-                    <img src="${item.imageUrl}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
+                    <img src="${item.imageUrl || 'https://placehold.co/600x400'}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
                 </div>
                 <div class="card-content">
                     <h3>${item.title}</h3>
+                    ${timeBadge}
                     ${savingsText}
                     <div class="card-meta">
                         <span class="tag">${icon} ${item.category} ${subText}</span>
-                        <span class="price">${item.price} ${item.currency}</span>
+                        ${priceDisplay}
                     </div>
                 </div>
             </article>
@@ -273,14 +398,12 @@ export const HomeView = {
 
     // Helper: Render Timeline Structure
     renderTimeline: (items) => {
-        // 1. Sort items by Date (Someday last)
         const sortedItems = [...items].sort((a, b) => {
             if (!a.targetDate) return 1;
             if (!b.targetDate) return -1;
             return new Date(a.targetDate) - new Date(b.targetDate);
         });
 
-        // 2. Group items by Month
         const groups = {};
         sortedItems.forEach(item => {
             let key = i18n.t('timeline.someday');
@@ -292,7 +415,6 @@ export const HomeView = {
             groups[key].push(item);
         });
 
-        // 3. Build HTML
         let html = `<div class="timeline-container">`;
 
         for (const [groupName, groupItems] of Object.entries(groups)) {

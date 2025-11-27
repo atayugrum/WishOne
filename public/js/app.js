@@ -7,6 +7,7 @@ import { FriendWishlistView } from './views/FriendWishlistView.js';
 import { InspoView } from './views/InspoView.js';
 import { ClosetView } from './views/ClosetView.js';
 import { ComboView } from './views/ComboView.js';
+import { ProfileView } from './views/ProfileView.js'; // Import New View
 import { authService } from './services/AuthService.js';
 
 // Import AI modules
@@ -21,6 +22,7 @@ const routes = {
     '/inspo': InspoView,
     '/closet': ClosetView,
     '/combos': ComboView,
+    '/profile': ProfileView, // Add Route
     '404': { template: '<h1>404 - Not Found</h1>' }
 };
 
