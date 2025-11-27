@@ -1,0 +1,840 @@
+/* css/components.css */
+
+/* --- 1. The Glass Card --- */
+.glass-panel {
+    background: var(--glass-base);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--glass-radius);
+    box-shadow: var(--glass-shadow);
+    transition: transform 0.3s var(--ease-ios), box-shadow 0.3s var(--ease-ios);
+}
+
+.glass-panel:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.12);
+    border-color: rgba(255, 255, 255, 0.8);
+}
+
+/* --- 2. Primary Button --- */
+.btn-primary {
+    background: var(--text-primary);
+    color: white;
+    font-family: var(--font-body);
+    font-weight: 600;
+    padding: 12px 24px;
+    border-radius: 100px;
+    /* Pill shape */
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s var(--ease-ios), opacity 0.2s;
+}
+
+.btn-primary:active {
+    transform: scale(0.96);
+    /* Tactile click feel */
+}
+
+/* --- 3. Floating Header --- */
+.floating-header {
+    position: fixed;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 800px;
+    height: 70px;
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+
+    /* Heavy Glass Effect */
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 100px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
+    overflow: visible;
+}
+
+/* --- Skeleton Loading Animation --- */
+.skeleton-card {
+    pointer-events: none;
+}
+
+.skeleton-img {
+    height: 180px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+
+    /* Shimmer Effect */
+    animation: shimmer 1.5s infinite linear;
+    background: linear-gradient(to right,
+            rgba(255, 255, 255, 0.1) 0%,
+            rgba(255, 255, 255, 0.3) 50%,
+            rgba(255, 255, 255, 0.1) 100%);
+    background-size: 200% 100%;
+}
+
+.skeleton-text {
+    height: 16px;
+    background: rgba(0, 0, 0, 0.06);
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.skeleton-text.title {
+    width: 70%;
+}
+
+.skeleton-text.meta {
+    width: 40%;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* --- Floating Action Button (FAB) --- */
+.fab-add {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    color: white;
+    border: none;
+    font-size: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: transform 0.2s var(--ease-ios);
+    z-index: 100;
+}
+
+.fab-add:hover {
+    transform: scale(1.1) rotate(90deg);
+}
+
+/* --- Modal System --- */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    /* Dim background */
+    backdrop-filter: blur(5px);
+    /* Blur background behind modal */
+    z-index: 1000;
+    display: none;
+    /* Hidden by default */
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s var(--ease-ios);
+}
+
+.modal-overlay.active {
+    opacity: 1;
+}
+
+.modal-content {
+    width: 90%;
+    max-width: 500px;
+    background: rgba(255, 255, 255, 0.85);
+    /* More opaque than normal cards */
+    padding: 32px;
+    transform: scale(0.95) translateY(20px);
+    transition: transform 0.3s var(--ease-ios);
+}
+
+.modal-overlay.active .modal-content {
+    transform: scale(1) translateY(0);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+/* --- Form Styles --- */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-row {
+    display: flex;
+    gap: 16px;
+}
+
+label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+input,
+select {
+    width: 100%;
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.5);
+    font-family: var(--font-body);
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+input:focus,
+select:focus {
+    outline: none;
+    background: white;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 4px var(--accent-glow);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-weight: 600;
+    cursor: pointer;
+}
+
+/* --- Card / Item --- */
+.card {
+    display: inline-block;
+    /* For column layout */
+    width: 100%;
+    /* Fill the column width */
+    margin-bottom: 24px;
+    /* Space under each card */
+    break-inside: avoid;
+    /* Prevent split in masonry */
+
+    background: var(--glass-base);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--glass-radius);
+    box-shadow: var(--glass-shadow);
+    transition: transform 0.3s var(--ease-ios);
+    position: relative;
+    /* For absolute children (buttons, badges) */
+}
+
+.card-img-container {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 16px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.card-img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.card-content {
+    padding: 16px;
+}
+
+.card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 8px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.card-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.price {
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.tag {
+    background: rgba(255, 255, 255, 0.4);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* --- Gift Button --- */
+.gift-btn {
+    color: #34C759;
+    /* Apple Green */
+}
+
+.gift-btn:hover {
+    background: #34C759;
+    color: white;
+}
+
+/* --- Card Action Button (Delete / Gift / Closet icons) --- */
+.card-action-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    z-index: 10;
+
+    /* Glass Style */
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    color: #ff3b30;
+    /* Apple Red */
+    font-size: 20px;
+    line-height: 1;
+
+    /* Hidden by default */
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.2s var(--ease-ios);
+}
+
+/* Show on Hover */
+.card:hover .card-action-btn {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.card-action-btn:hover {
+    background: #ff3b30;
+    color: white;
+    transform: scale(1.1) !important;
+}
+
+/* --- Closet Button (Top-Left Green Action) --- */
+.closet-btn {
+    left: 10px;
+    right: auto;
+    color: #34C759 !important;
+    /* Force Green */
+}
+
+.closet-btn:hover {
+    background: #34C759 !important;
+    color: white !important;
+}
+
+/* --- Board Dashboard Grid --- */
+.boards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 24px;
+    padding-bottom: 80px;
+}
+
+.board-card {
+    cursor: pointer;
+    overflow: hidden;
+    transition: transform 0.2s;
+}
+
+.board-card:hover {
+    transform: translateY(-4px);
+    border-color: var(--accent-color);
+}
+
+.board-cover {
+    height: 150px;
+    background-size: cover;
+    background-position: center;
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.dashed-cover {
+    border: 2px dashed rgba(0, 0, 0, 0.1);
+    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: var(--text-secondary);
+}
+
+.board-info {
+    padding: 16px;
+}
+
+.board-info h3 {
+    font-size: 1rem;
+    margin: 0;
+}
+
+.board-info p {
+    font-size: 0.8rem;
+    margin-top: 4px;
+    color: var(--text-tertiary);
+}
+
+/* --- Dashboard Widget --- */
+.dashboard-widget {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 24px;
+    margin-bottom: 40px;
+    background: rgba(255, 255, 255, 0.5);
+    /* Lighter glass */
+    border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.stat-box {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-secondary);
+}
+
+.stat-value {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.stat-divider {
+    width: 1px;
+    height: 40px;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* --- Owned Card Style --- */
+.card-owned {
+    opacity: 0.8;
+    background: rgba(255, 255, 255, 0.1);
+    /* More transparent */
+}
+
+.card-owned img {
+    filter: grayscale(30%);
+    /* Slightly muted */
+}
+
+/* --- Pin Grid (Pure Visuals) --- */
+.inspo-masonry .pin-item {
+    margin-bottom: 16px;
+    border-radius: 16px;
+    overflow: hidden;
+    break-inside: avoid;
+}
+
+.inspo-masonry img {
+    width: 100%;
+    display: block;
+    border-radius: 16px;
+    transition: transform 0.3s;
+}
+
+.inspo-masonry img:hover {
+    transform: scale(1.02);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* --- The Gifted State (Gold) --- */
+.card-gifted {
+    border: 2px solid #FFD700 !important;
+    /* Gold Border */
+    background: rgba(255, 215, 0, 0.15) !important;
+    /* Subtle Gold Tint */
+    box-shadow: 0 10px 40px rgba(255, 215, 0, 0.2) !important;
+    transform: scale(1.02);
+}
+
+.gift-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    background: #FFD700;
+    color: #5a4a00;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 6px 12px;
+    border-radius: 20px;
+    z-index: 20;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.gift-badge::before {
+    content: "🎁";
+}
+
+/* --- The Locked State (Grey) --- */
+.card-locked {
+    opacity: 0.5;
+    filter: grayscale(100%);
+    pointer-events: none;
+    /* Can't click anything */
+    border: 1px dashed rgba(0, 0, 0, 0.2);
+}
+
+.card-locked .card-action-btn {
+    display: none;
+    /* Hide buttons on locked cards */
+}
+
+/* --- Welcome / Hero Screen --- */
+.welcome-container {
+    height: 90vh;
+    /* Fill screen */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+.hero-card {
+    padding: 60px 40px;
+    max-width: 400px;
+    width: 90%;
+    background: rgba(255, 255, 255, 0.4);
+    /* Extra frosty */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.hero-title {
+    font-size: 3rem;
+    background: linear-gradient(135deg, #333 0%, #000 100%);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    line-height: 1.6;
+}
+
+.hero-divider {
+    width: 40px;
+    height: 4px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 2px;
+    margin-bottom: 32px;
+}
+
+.hero-btn {
+    width: 100%;
+    padding: 16px;
+    font-size: 1.1rem;
+    margin-bottom: 24px;
+    background: linear-gradient(135deg, #1D1D1F 0%, #434344 100%);
+}
+
+.hero-footer {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* --- Header Actions / Icon Buttons --- */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 100%;
+}
+
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
+/* --- User Avatar --- */
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    transition: transform 0.2s, border-color 0.2s;
+    position: relative;
+    z-index: 1001;
+    pointer-events: auto;
+}
+
+.user-avatar:hover {
+    transform: scale(1.1);
+    border-color: var(--accent-color);
+    /* Blue glow on hover */
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    /* Let the click pass through to the wrapper */
+}
+
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 12px;
+}
+
+.cat-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cat-pill:hover {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.cat-pill.selected {
+    background: var(--text-primary);
+    color: white;
+    border-color: var(--text-primary);
+    transform: scale(1.05);
+}
+
+.cat-icon {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+}
+
+.cat-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* --- Subcategory Chips --- */
+.subcategory-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.sub-chip {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.sub-chip.selected {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+/* --- Priority Segmented Control --- */
+.priority-segmented-control {
+    display: flex;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.priority-segmented-control label {
+    flex: 1;
+    margin: 0;
+    text-align: center;
+}
+
+.priority-segmented-control input {
+    display: none;
+}
+
+.priority-segmented-control span {
+    display: block;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--text-secondary);
+}
+
+.priority-segmented-control input:checked+span {
+    background: white;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(4px);
+}
+
+.tag-urgent {
+    color: #ff3b30;
+}
+
+/* Red */
+.tag-overdue {
+    color: #ff3b30;
+    text-decoration: underline;
+}
+
+.tag-soon {
+    color: #ff9500;
+}
+
+/* Orange */
+.tag-far {
+    color: #007aff;
+}
+
+/* Blue */
+
+.savings-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-style: italic;
+}
+
+
+/* --- View Toggle Buttons --- */
+.view-toggle {
+    display: flex;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px;
+    border-radius: 12px;
+    margin-left: 16px;
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.toggle-btn.active {
+    background: white;
+    color: var(--text-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Timeline View Styles --- */
+.timeline-container {
+    position: relative;
+    padding: 20px 0;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    background: rgba(0, 0, 0, 0.1);
+    transform: translateX(-50%);
+}
+
+.timeline-group {
+    margin-bottom: 40px;
+    position: relative;
+}
+
+.timeline-header {
+    background: var(--glass-base);
+    backdrop-filter: blur(10px);
+    padding: 8px 16px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 20px;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1px solid var(--glass-border);
+}
+
+.timeline-item {
+    margin-bottom: 24px;
+    position: relative;
+    width: 100%;
+}

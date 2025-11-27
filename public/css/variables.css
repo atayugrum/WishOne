@@ -1,0 +1,60 @@
+/* css/variables.css */
+
+:root {
+    /* --- Typography --- */
+    --font-display: 'Urbanist', sans-serif;
+    --font-body: 'Inter', sans-serif;
+
+    /* --- DEFAULT: Zen / Cool Palette --- */
+    --bg-color-1: #E6E6FA;
+    /* Lavender */
+    --bg-color-2: #F8C8DC;
+    /* Soft Pink */
+    --bg-color-3: #ADD8E6;
+    /* Baby Blue */
+    --bg-color-4: #FFDAB9;
+    /* Peach */
+
+    --accent-color: #007AFF;
+    /* Apple Blue */
+    --accent-glow: rgba(0, 122, 255, 0.4);
+
+    --text-primary: #1D1D1F;
+    --text-secondary: #86868B;
+    --text-tertiary: #D2D2D7;
+
+    /* --- Glassmorphism --- */
+    --glass-base: rgba(255, 255, 255, 0.25);
+    --glass-highlight: rgba(255, 255, 255, 0.4);
+    --glass-border: rgba(255, 255, 255, 0.45);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+    --glass-blur: blur(40px);
+    --glass-radius: 24px;
+
+    /* --- Physics --- */
+    --ease-ios: cubic-bezier(0.25, 1, 0.5, 1);
+    --ease-fluid: cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* --- LOVE MODE OVERRIDES --- */
+body.mode-love {
+    /* Warmer, Rose Gold Palette */
+    --bg-color-1: #FFB7B2;
+    /* Warm Pink */
+    --bg-color-2: #FF9AA2;
+    /* Salmon */
+    --bg-color-3: #FFDAC1;
+    /* Peach */
+    --bg-color-4: #E2F0CB;
+    /* Soft Green contrast */
+
+    --accent-color: #FF5A5F;
+    /* Passion Red */
+    --accent-glow: rgba(255, 90, 95, 0.4);
+
+    --glass-base: rgba(255, 240, 245, 0.35);
+    /* Pinkish Glass */
+    --glass-border: rgba(255, 255, 255, 0.6);
+    --text-primary: #4A2C2C;
+    /* Dark Brown/Red for text */
+}

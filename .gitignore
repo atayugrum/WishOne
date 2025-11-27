@@ -1,0 +1,13 @@
+# Node modules (ileride npm kullanırsan)
+node_modules/
+
+# Env files (API key'ler vs)
+.env
+.env.local
+.env.*.local
+
+# VS Code config
+.vscode/
+
+# Mac vs için
+.DS_Store
