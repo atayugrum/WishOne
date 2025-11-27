@@ -2,9 +2,11 @@ import { Router } from './utils/Router.js';
 import { Header } from './components/Header.js';
 import { HomeView } from './views/HomeView.js';
 import { WelcomeView } from './views/WelcomeView.js';
-import { PartnerView } from './views/PartnerView.js';
+import { FriendsView } from './views/FriendsView.js';
+import { FriendWishlistView } from './views/FriendWishlistView.js';
 import { InspoView } from './views/InspoView.js';
 import { ClosetView } from './views/ClosetView.js';
+import { ComboView } from './views/ComboView.js';
 import { authService } from './services/AuthService.js';
 
 // Import AI modules
@@ -14,9 +16,11 @@ import { aiService } from './services/AIService.js';
 const routes = {
     '/': HomeView,
     '/welcome': WelcomeView,
-    '/partner': PartnerView,
+    '/friends': FriendsView,
+    '/friend-wishlist': FriendWishlistView,
     '/inspo': InspoView,
     '/closet': ClosetView,
+    '/combos': ComboView,
     '404': { template: '<h1>404 - Not Found</h1>' }
 };
 

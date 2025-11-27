@@ -1,4 +1,5 @@
 import { authService } from './AuthService.js';
+import { apiCall } from '../config/api.js';
 
 export class AIService {
     constructor() {
@@ -7,53 +8,31 @@ export class AIService {
                 "Good energy today.",
                 "Ready to manifest?",
                 "Your dreams look good on you."
-            ],
-            highPrice: [
-                "A big goal. You deserve it.",
-                "Let's start saving for this one.",
-                "Quality over quantity."
-            ],
-            fashion: [
-                "This is going to look amazing.",
-                "Add this to your closet soon!",
-                "Style is eternal."
-            ],
-            tech: [
-                "Upgrade time?",
-                "Future proof.",
-                "Tech makes life smoother."
-            ],
-            completed: [
-                "You manifested it!",
-                "Another dream reality.",
-                "Proud of you."
             ]
         };
     }
 
     // Decide what to say based on the item added
-    getReaction(item) {
-        // 1. Price Check
-        if (item.price > 20000) {
-            return this.getRandom(this.quotes.highPrice);
+    async getReaction(item) {
+        try {
+            // Try to get a smart reaction from the backend
+            const response = await apiCall('/api/ai/reaction', 'POST', {
+                action: 'add_item',
+                userContext: { name: authService.currentUser?.displayName || 'User' },
+                item: item
+            });
+            return response.message;
+        } catch (e) {
+            // Fallback to local logic if offline/error
+            return this.getLocalReaction(item);
         }
+    }
 
-        // 2. Time Check (Long term)
-        if (item.targetDate) {
-            const days = Math.ceil((new Date(item.targetDate) - new Date()) / (1000 * 60 * 60 * 24));
-            if (days > 90) return "Patience is the key to manifestation.";
-            if (days < 7 && days > 0) return "Almost yours!";
-        }
-
-        // 3. Category Check
+    getLocalReaction(item) {
+        if (item.price > 20000) return "A big goal. You deserve it.";
         const cat = item.category ? item.category.toLowerCase() : '';
-        if (cat === 'fashion') return this.getRandom(this.quotes.fashion);
-        if (cat === 'tech') return this.getRandom(this.quotes.tech);
-        if (cat === 'home') return "Your sanctuary is getting an upgrade.";
-        if (cat === 'experience') return "Memories over things. Good choice.";
-        if (cat === 'wellness') return "Invest in yourself first.";
-
-        // 4. Default
+        if (cat === 'fashion') return "This is going to look amazing.";
+        if (cat === 'tech') return "Upgrade time?";
         return "Added to your vision.";
     }
 

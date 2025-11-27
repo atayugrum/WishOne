@@ -807,6 +807,201 @@ select:focus {
     top: 0;
     bottom: 0;
     left: 50%;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    transition: transform 0.2s, border-color 0.2s;
+    position: relative;
+    z-index: 1001;
+    pointer-events: auto;
+}
+
+.user-avatar:hover {
+    transform: scale(1.1);
+    border-color: var(--accent-color);
+    /* Blue glow on hover */
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+    /* Let the click pass through to the wrapper */
+}
+
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 12px;
+}
+
+.cat-pill {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.cat-pill:hover {
+    background: rgba(255, 255, 255, 0.7);
+}
+
+.cat-pill.selected {
+    background: var(--text-primary);
+    color: white;
+    border-color: var(--text-primary);
+    transform: scale(1.05);
+}
+
+.cat-icon {
+    font-size: 1.5rem;
+    margin-bottom: 4px;
+}
+
+.cat-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* --- Subcategory Chips --- */
+.subcategory-scroll {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.sub-chip {
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.sub-chip.selected {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+/* --- Priority Segmented Control --- */
+.priority-segmented-control {
+    display: flex;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.priority-segmented-control label {
+    flex: 1;
+    margin: 0;
+    text-align: center;
+}
+
+.priority-segmented-control input {
+    display: none;
+}
+
+.priority-segmented-control span {
+    display: block;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    color: var(--text-secondary);
+}
+
+.priority-segmented-control input:checked+span {
+    background: white;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(4px);
+}
+
+.tag-urgent {
+    color: #ff3b30;
+}
+
+/* Red */
+.tag-overdue {
+    color: #ff3b30;
+    text-decoration: underline;
+}
+
+.tag-soon {
+    color: #ff9500;
+}
+
+/* Orange */
+.tag-far {
+    color: #007aff;
+}
+
+/* Blue */
+
+.savings-hint {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-style: italic;
+}
+
+
+/* --- View Toggle Buttons --- */
+.view-toggle {
+    display: flex;
+    background: rgba(0, 0, 0, 0.05);
+    padding: 4px;
+    border-radius: 12px;
+    margin-left: 16px;
+}
+
+.toggle-btn {
+    background: none;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.toggle-btn.active {
+    background: white;
+    color: var(--text-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Timeline View Styles --- */
+.timeline-container {
+    position: relative;
+    padding: 20px 0;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
     width: 2px;
     background: rgba(0, 0, 0, 0.1);
     transform: translateX(-50%);
@@ -837,4 +1032,379 @@ select:focus {
     margin-bottom: 24px;
     position: relative;
     width: 100%;
+}
+
+/* --- Magic Button --- */
+.btn-magic {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-size: 200% 200%;
+    animation: gradientMove 3s ease infinite;
+}
+
+.btn-magic:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(255, 154, 158, 0.6);
+}
+
+.btn-magic:active {
+    transform: scale(0.95);
+}
+
+@keyframes gradientMove {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* --- Card Time Tag Redesign --- */
+.card-overlay-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 10;
+}
+
+.time-tag {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    padding: 6px 12px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.time-tag.tag-urgent {
+    color: #FF3B30;
+    background: #FFF0F0;
+}
+
+.time-tag.tag-soon {
+    color: #FF9500;
+    background: #FFF8F0;
+}
+
+.time-tag.tag-far {
+    color: #007AFF;
+    background: #F0F8FF;
+}
+
+.time-tag.tag-overdue {
+    color: #FFFFFF;
+    background: #FF3B30;
+}
+
+/* --- Discount Badge --- */
+.discount-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #FF3B30;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 12px;
+    z-index: 10;
+    box-shadow: 0 4px 10px rgba(255, 59, 48, 0.3);
+}
+
+/* --- Ad Slot (In-Grid) --- */
+.ad-wrapper {
+    width: 100%;
+    margin-bottom: 24px;
+    break-inside: avoid;
+}
+
+.ad-slot {
+    padding: 24px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px dashed var(--accent-color);
+}
+
+.ad-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.ad-content h3 {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+}
+
+.ad-content p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* --- Content Area Constraint --- */
+#content-area {
+    max-width: 1100px;
+    margin: 0 auto;
+    color: var(--text-secondary);
+    transition: all 0.2s;
+}
+
+.toggle-btn.active {
+    background: white;
+    color: var(--text-primary);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* --- Timeline View Styles --- */
+.timeline-container {
+    position: relative;
+    padding: 20px 0;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.timeline-container::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    background: rgba(0, 0, 0, 0.1);
+    transform: translateX(-50%);
+}
+
+.timeline-group {
+    margin-bottom: 40px;
+    position: relative;
+}
+
+.timeline-header {
+    background: var(--glass-base);
+    backdrop-filter: blur(10px);
+    padding: 8px 16px;
+    border-radius: 20px;
+    display: inline-block;
+    margin-bottom: 20px;
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+    font-weight: 600;
+    color: var(--text-secondary);
+    border: 1px solid var(--glass-border);
+}
+
+.timeline-item {
+    margin-bottom: 24px;
+    position: relative;
+    width: 100%;
+}
+
+/* --- Magic Button --- */
+.btn-magic {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-size: 200% 200%;
+    animation: gradientMove 3s ease infinite;
+}
+
+.btn-magic:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 8px 25px rgba(255, 154, 158, 0.6);
+}
+
+.btn-magic:active {
+    transform: scale(0.95);
+}
+
+@keyframes gradientMove {
+    0% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+
+    100% {
+        background-position: 0% 50%;
+    }
+}
+
+/* --- Card Time Tag Redesign --- */
+.card-overlay-badge {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    z-index: 10;
+}
+
+.time-tag {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(8px);
+    padding: 6px 12px;
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.time-tag.tag-urgent {
+    color: #FF3B30;
+    background: #FFF0F0;
+}
+
+.time-tag.tag-soon {
+    color: #FF9500;
+    background: #FFF8F0;
+}
+
+.time-tag.tag-far {
+    color: #007AFF;
+    background: #F0F8FF;
+}
+
+.time-tag.tag-overdue {
+    color: #FFFFFF;
+    background: #FF3B30;
+}
+
+/* --- Discount Badge --- */
+.discount-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: #FF3B30;
+    color: white;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 12px;
+    z-index: 10;
+    box-shadow: 0 4px 10px rgba(255, 59, 48, 0.3);
+}
+
+/* --- Ad Slot (In-Grid) --- */
+.ad-wrapper {
+    width: 100%;
+    margin-bottom: 24px;
+    break-inside: avoid;
+}
+
+.ad-slot {
+    padding: 24px;
+    text-align: center;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px dashed var(--accent-color);
+}
+
+.ad-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.ad-content h3 {
+    font-size: 1.2rem;
+    margin-bottom: 8px;
+}
+
+.ad-content p {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+/* --- Content Area Constraint --- */
+#content-area {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+}
+
+/* --- Side Banner Ads (Skyscraper) --- */
+.ad-side-banner {
+    position: fixed;
+    top: 120px;
+    /* Below header */
+    width: 160px;
+    height: 600px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    text-align: center;
+    z-index: 90;
+    /* Below modal/header */
+    transition: opacity 0.3s;
+}
+
+.ad-side-banner.left {
+    left: 20px;
+}
+
+.ad-side-banner.right {
+    right: 20px;
+}
+
+/* Hide side banners on smaller screens */
+@media (max-width: 1500px) {
+    .ad-side-banner {
+        display: none;
+    }
 }

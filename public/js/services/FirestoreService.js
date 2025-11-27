@@ -1,20 +1,21 @@
 // js/services/FirestoreService.js
 import { db } from '../config/firebase-config.js';
-import { 
-    collection, 
-    getDocs, 
-    addDoc, 
-    deleteDoc, 
-    updateDoc, // <--- THIS WAS MISSING
-    doc, 
-    getDoc,    // Used for profile fetching
-    query, 
-    where, 
-    serverTimestamp 
+import {
+    collection,
+    getDocs,
+    addDoc,
+    deleteDoc,
+    updateDoc,
+    setDoc,
+    doc,
+    getDoc,
+    query,
+    where,
+    serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 export class FirestoreService {
-    
+
     constructor() {
         this.itemsCollection = collection(db, 'items');
     }
@@ -38,11 +39,10 @@ export class FirestoreService {
     // 1. Get Wishlist
     async getWishlist(userId) {
         try {
-            // Added: where("isOwned", "==", false)
             const q = query(
-                this.itemsCollection, 
+                this.itemsCollection,
                 where("ownerId", "==", userId),
-                where("isOwned", "==", false) 
+                where("isOwned", "==", false)
             );
             const querySnapshot = await getDocs(q);
             if (querySnapshot.empty) return [];
@@ -80,36 +80,54 @@ export class FirestoreService {
         }
     }
 
-    // 4. LINK PARTNER (The function causing the error)
-    async linkPartner(myUid, partnerEmail) {
-        // Find partner by email
+    // 4. FRIEND MANAGEMENT (Replaces Partner)
+    async addFriend(myUid, friendEmail) {
+        // 1. Find friend by email
         const usersRef = collection(db, "users");
-        const q = query(usersRef, where("email", "==", partnerEmail));
+        const q = query(usersRef, where("email", "==", friendEmail));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-            throw new Error("User not found. Ask them to login to WishOne first!");
+            throw new Error("User not found. Ask them to join WishOne!");
         }
 
-        const partnerDoc = querySnapshot.docs[0];
-        const partnerId = partnerDoc.id;
+        const friendDoc = querySnapshot.docs[0];
+        const friendId = friendDoc.id;
+        const friendData = friendDoc.data();
 
-        // Check if trying to link to self
-        if (partnerId === myUid) {
-            throw new Error("You cannot link to yourself!");
+        if (friendId === myUid) {
+            throw new Error("You cannot add yourself as a friend!");
         }
 
-        // Update MY profile
-        await updateDoc(doc(db, "users", myUid), {
-            partnerId: partnerId
+        // 2. Add to MY friends collection (subcollection)
+        // users/{myUid}/friends/{friendId}
+        const myFriendRef = doc(db, "users", myUid, "friends", friendId);
+        await setDoc(myFriendRef, {
+            uid: friendId,
+            email: friendData.email,
+            displayName: friendData.displayName || "Friend",
+            avatarUrl: friendData.avatarUrl || null,
+            addedAt: serverTimestamp()
         });
 
-        // Update THEIR profile
-        await updateDoc(doc(db, "users", partnerId), {
-            partnerId: myUid
+        // 3. Add ME to THEIR friends collection (reciprocal for now)
+        const myProfile = await this.getUserProfile(myUid);
+        const theirFriendRef = doc(db, "users", friendId, "friends", myUid);
+        await setDoc(theirFriendRef, {
+            uid: myUid,
+            email: myProfile.email,
+            displayName: myProfile.displayName,
+            avatarUrl: myProfile.avatarUrl || null,
+            addedAt: serverTimestamp()
         });
 
-        return partnerDoc.data();
+        return friendData;
+    }
+
+    async getFriends(userId) {
+        const friendsRef = collection(db, "users", userId, "friends");
+        const snap = await getDocs(friendsRef);
+        return snap.docs.map(doc => doc.data());
     }
 
     // 5. Get User Profile
@@ -119,15 +137,15 @@ export class FirestoreService {
         return snap.exists() ? snap.data() : null;
     }
 
-    // 5. CLAIM / UNCLAIM ITEM
+    // 6. CLAIM / UNCLAIM ITEM
     async toggleClaimItem(itemId, userId, currentClaimedBy) {
         const itemRef = doc(db, 'items', itemId);
-        
+
         // If I already claimed it -> Unclaim it (set to null)
         if (currentClaimedBy === userId) {
             await updateDoc(itemRef, { claimedBy: null });
             return "unclaimed";
-        } 
+        }
         // If nobody claimed it -> Claim it
         else if (!currentClaimedBy) {
             await updateDoc(itemRef, { claimedBy: userId });
@@ -139,7 +157,7 @@ export class FirestoreService {
         }
     }
 
-    // 6. BOARD MANAGEMENT
+    // 7. BOARD MANAGEMENT
     async createBoard(userId, title, coverUrl) {
         const boardData = {
             ownerId: userId,
@@ -157,7 +175,7 @@ export class FirestoreService {
         return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    // 7. PIN MANAGEMENT (Images inside boards)
+    // 8. PIN MANAGEMENT (Images inside boards)
     async addPin(boardId, imageUrl) {
         // Add image to sub-collection 'pins'
         await addDoc(collection(db, 'boards', boardId, 'pins'), {
@@ -174,7 +192,7 @@ export class FirestoreService {
 
     async markAsOwned(itemId) {
         const itemRef = doc(db, 'items', itemId);
-        await updateDoc(itemRef, { 
+        await updateDoc(itemRef, {
             isOwned: true,
             purchasedAt: serverTimestamp() // Optional: remember when you got it
         });
@@ -184,7 +202,7 @@ export class FirestoreService {
     async getCloset(userId) {
         // Query: Owner is me AND isOwned is true
         const q = query(
-            this.itemsCollection, 
+            this.itemsCollection,
             where("ownerId", "==", userId),
             where("isOwned", "==", true)
         );

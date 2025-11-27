@@ -1,5 +1,5 @@
 import { authService } from '../services/AuthService.js';
-import { i18n } from '../services/LocalizationService.js'; // Import i18n
+import { i18n } from '../services/LocalizationService.js';
 
 export class Header {
     constructor() {
@@ -23,9 +23,10 @@ export class Header {
 
             <nav class="nav-pills">
                 <a href="#/" class="nav-link active" data-path="/">${i18n.t('nav.home')}</a>
-                <a href="#/partner" class="nav-link" data-path="/partner">${i18n.t('nav.partner')}</a>
+                <a href="#/friends" class="nav-link" data-path="/friends">${i18n.t('nav.friends')}</a>
                 <a href="#/inspo" class="nav-link" data-path="/inspo">${i18n.t('nav.inspo')}</a>
                 <a href="#/closet" class="nav-link" data-path="/closet">${i18n.t('nav.closet')}</a>
+                <a href="#/combos" class="nav-link" data-path="/combos">${i18n.t('nav.combos') || 'Combos'}</a>
             </nav>
 
             <div class="header-actions">
@@ -65,7 +66,7 @@ export class Header {
         const authContainer = this.element.querySelector('#auth-container');
         authContainer.addEventListener('click', async (e) => {
             if (e.target.closest('.user-avatar')) {
-                if(confirm("Log out?")) await authService.logout();
+                if (confirm("Log out?")) await authService.logout();
             }
         });
     }

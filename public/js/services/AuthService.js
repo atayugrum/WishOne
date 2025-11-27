@@ -12,7 +12,6 @@ export class AuthService {
     async login() {
         try {
             const result = await signInWithPopup(auth, googleProvider);
-            // The init listener will handle the DB saving, so we just return here
             return result.user;
         } catch (error) {
             console.error("Login failed:", error);
@@ -24,30 +23,30 @@ export class AuthService {
         await signOut(auth);
         this.currentUser = null;
         this.userProfile = null;
-        // No reload needed, app.js handles it
     }
 
-    // THIS IS THE FIXED PART
     init(callback) {
         onAuthStateChanged(auth, async (user) => {
             this.currentUser = user;
-            
+
             if (user) {
                 const userRef = doc(db, "users", user.uid);
                 const snapshot = await getDoc(userRef);
 
                 if (snapshot.exists()) {
-                    // Profile exists, load it
                     this.userProfile = snapshot.data();
                 } else {
-                    // CRITICAL FIX: User logged in but has no DB profile. Create it now.
-                    console.log("Creating missing profile for existing user...");
+                    console.log("Creating new user profile...");
                     const newProfile = {
                         uid: user.uid,
                         email: user.email,
                         displayName: user.displayName,
                         photoURL: user.photoURL,
-                        partnerId: null,
+                        username: user.email.split('@')[0],
+                        firstName: user.displayName ? user.displayName.split(' ')[0] : 'User',
+                        lastName: user.displayName ? user.displayName.split(' ').slice(1).join(' ') : '',
+                        plan: 'free',
+                        friends: [],
                         createdAt: new Date()
                     };
                     await setDoc(userRef, newProfile);
@@ -56,9 +55,20 @@ export class AuthService {
             } else {
                 this.userProfile = null;
             }
-            
-            callback(user); 
+
+            callback(user);
         });
+    }
+
+    get isPremium() {
+        return this.userProfile?.plan === 'premium';
+    }
+
+    async upgradeToPremium() {
+        if (!this.currentUser) return;
+        const userRef = doc(db, "users", this.currentUser.uid);
+        await setDoc(userRef, { plan: 'premium' }, { merge: true });
+        if (this.userProfile) this.userProfile.plan = 'premium';
     }
 }
 

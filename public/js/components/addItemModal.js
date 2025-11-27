@@ -1,13 +1,13 @@
 // js/components/AddItemModal.js
 import { firestoreService } from '../services/FirestoreService.js';
 import { authService } from '../services/AuthService.js';
-import { CATEGORIES } from '../config/categories.js'; // Import config
+import { CATEGORIES } from '../config/categories.js';
 
 export class AddItemModal {
     constructor(onItemAdded) {
         this.onItemAdded = onItemAdded;
         this.overlay = null;
-        this.selectedCategory = null; // State for selection
+        this.selectedCategory = null;
         this.selectedSubcategory = null;
         this.render();
     }
@@ -15,7 +15,7 @@ export class AddItemModal {
     render() {
         this.overlay = document.createElement('div');
         this.overlay.className = 'modal-overlay';
-        
+
         // Generate Category Grid HTML
         const categoryGridHtml = Object.keys(CATEGORIES).map(key => {
             const cat = CATEGORIES[key];
@@ -37,7 +37,21 @@ export class AddItemModal {
                 <form id="add-item-form">
                     <div class="form-group">
                         <label>What is it?</label>
-                        <input type="text" name="title" placeholder="e.g. Vintage Lamp" required autocomplete="off">
+                        <div style="display: flex; gap: 8px;">
+                            <input type="text" name="title" id="input-title" placeholder="e.g. Vintage Lamp" required autocomplete="off" style="flex: 1;">
+                            <button type="button" id="btn-magic-add" class="btn-magic" title="Auto-fill from URL">✨ Magic</button>
+                        </div>
+                    </div>
+
+                    <!-- Magic Add URL Input (Hidden initially) -->
+                    <div id="magic-url-container" style="display:none; margin-bottom: 16px;">
+                        <div class="form-group">
+                            <label>Paste Product URL</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="url" id="magic-url-input" placeholder="https://..." style="flex: 1;">
+                                <button type="button" id="btn-fetch-magic" class="btn-primary">Fetch</button>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="form-row">
@@ -108,15 +122,94 @@ export class AddItemModal {
         const imgInput = this.overlay.querySelector('#img-input');
         const imgPreview = this.overlay.querySelector('#img-preview');
 
+        // Magic Add Elements
+        const btnMagicAdd = this.overlay.querySelector('#btn-magic-add');
+        const magicContainer = this.overlay.querySelector('#magic-url-container');
+        const btnFetchMagic = this.overlay.querySelector('#btn-fetch-magic');
+        const magicInput = this.overlay.querySelector('#magic-url-input');
+
+        // Toggle Magic Input
+        btnMagicAdd.addEventListener('click', () => {
+            magicContainer.style.display = magicContainer.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Fetch Logic
+        btnFetchMagic.addEventListener('click', async () => {
+            const url = magicInput.value.trim();
+            if (!url) return;
+
+            try {
+                btnFetchMagic.textContent = "✨...";
+                btnFetchMagic.disabled = true;
+
+                const { apiCall } = await import('../config/api.js');
+
+                // 1. Get Metadata (Scraping)
+                const metaData = await apiCall('/api/product/metadata', 'POST', { url });
+
+                // Auto-fill basic data
+                if (metaData.title) this.overlay.querySelector('#input-title').value = metaData.title;
+                if (metaData.imageUrl) {
+                    imgInput.value = metaData.imageUrl;
+                    imgInput.dispatchEvent(new Event('input'));
+                }
+
+                // 2. Get AI Suggestions (Category, Price, Priority)
+                if (metaData.title || metaData.description) {
+                    btnFetchMagic.textContent = "🧠...";
+                    const aiData = await apiCall('/api/ai/suggestion', 'POST', {
+                        title: metaData.title,
+                        description: metaData.description || metaData.title,
+                        url: url
+                    });
+
+                    // Apply AI Suggestions
+                    if (aiData.category) {
+                        // Find matching category key (case-insensitive)
+                        const catKey = Object.keys(CATEGORIES).find(k => k.toLowerCase() === aiData.category.toLowerCase()) || 'Other';
+                        window.selectCategory(catKey);
+
+                        // Select subcategory if available
+                        if (aiData.subcategory && CATEGORIES[catKey]?.subcategories) {
+                            // Wait for render
+                            setTimeout(() => {
+                                const sub = aiData.subcategory;
+                                // Try to find close match or exact
+                                const exactSub = CATEGORIES[catKey].subcategories.find(s => s.toLowerCase() === sub.toLowerCase());
+                                if (exactSub) window.selectSubcategory(exactSub);
+                            }, 100);
+                        }
+                    }
+
+                    if (aiData.priceEstimate) {
+                        this.overlay.querySelector('input[name="price"]').value = aiData.priceEstimate;
+                    }
+
+                    if (aiData.currency) {
+                        this.overlay.querySelector('select[name="currency"]').value = aiData.currency;
+                    }
+                }
+
+                magicContainer.style.display = 'none';
+
+            } catch (error) {
+                alert("Could not fetch details. Try entering manually.");
+                console.error(error);
+            } finally {
+                btnFetchMagic.textContent = "Fetch";
+                btnFetchMagic.disabled = false;
+            }
+        });
+
         // Global handler for category selection inside the modal
         window.selectCategory = (key) => {
             this.selectedCategory = key;
-            this.selectedSubcategory = null; // Reset sub
+            this.selectedSubcategory = null;
 
             // Visual Update
             const pills = this.overlay.querySelectorAll('.cat-pill');
             pills.forEach(p => {
-                if(p.dataset.cat === key) p.classList.add('selected');
+                if (p.dataset.cat === key) p.classList.add('selected');
                 else p.classList.remove('selected');
             });
 
@@ -127,13 +220,15 @@ export class AddItemModal {
             this.renderSubcategories(key);
         };
 
+        // Fix: Ensure this is globally available and handles the click
         window.selectSubcategory = (sub) => {
             this.selectedSubcategory = sub;
             this.overlay.querySelector('#hidden-subcategory').value = sub;
-            
+
             const chips = this.overlay.querySelectorAll('.sub-chip');
             chips.forEach(c => {
-                if(c.textContent === sub) c.classList.add('selected');
+                // Use trim() to avoid whitespace mismatches
+                if (c.textContent.trim() === sub) c.classList.add('selected');
                 else c.classList.remove('selected');
             });
         };
@@ -141,7 +236,7 @@ export class AddItemModal {
         // Close Logic
         const closeBtns = this.overlay.querySelectorAll('.close-btn, .close-trigger');
         closeBtns.forEach(btn => btn.addEventListener('click', () => this.close()));
-        
+
         // Image Preview Logic
         imgInput.addEventListener('input', () => {
             const url = imgInput.value;
@@ -164,36 +259,36 @@ export class AddItemModal {
             btn.disabled = true;
 
             const formData = new FormData(form);
-            
-            // Get Category Config to store icon if needed, or just store key
+
             const itemData = {
                 ownerId: user.uid,
                 title: formData.get('title'),
-                price: Number(formData.get('price')),
+                price: parseFloat(formData.get('price')) || 0,
                 currency: formData.get('currency'),
                 category: formData.get('category'),
                 subcategory: formData.get('subcategory') || null,
                 priority: formData.get('priority'),
+                targetDate: formData.get('targetDate') || null,
                 imageUrl: formData.get('imageUrl') || null,
-                
-                // NEW FIELD
-                targetDate: formData.get('targetDate') || null
+
+                // Price Tracking Fields
+                url: document.getElementById('magic-url-input').value || null,
+                sourceSite: document.getElementById('magic-url-input').value ? new URL(document.getElementById('magic-url-input').value).hostname : null,
+                originalPrice: parseFloat(formData.get('price')) || 0,
+                lastPrice: parseFloat(formData.get('price')) || 0,
+                priceLastCheckedAt: new Date().toISOString(),
+                onSale: false
             };
 
             try {
                 await firestoreService.addItem(itemData);
                 this.close();
                 form.reset();
-                this.resetSelection(); // Clear UI state
+                this.resetSelection();
                 if (this.onItemAdded) this.onItemAdded();
-                import('../services/AIService.js').then(({ aiService }) => {
-                   const reaction = aiService.getReaction(itemData);
-                   if (window.aiCompanion) window.aiCompanion.say(reaction);
-                });
-
             } catch (error) {
-                console.error(error);
-                alert("Failed to save.");
+                console.error("Add Item Error:", error);
+                alert("Failed to save wish. Please try again.");
             } finally {
                 btn.textContent = "Add to Wishlist";
                 btn.disabled = false;

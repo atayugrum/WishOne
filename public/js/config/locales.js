@@ -2,9 +2,10 @@ export const TRANSLATIONS = {
     en: {
         nav: {
             home: "My List",
-            partner: "Partner",
+            friends: "Friends",
             inspo: "Inspo",
-            closet: "Closet"
+            closet: "Closet",
+            combos: "Combos"
         },
         home: {
             title: "My Wishlist",
@@ -17,11 +18,11 @@ export const TRANSLATIONS = {
             value: "Total Value",
             progress: "Progress"
         },
-        partner: {
-            title: "Partner Mode",
-            subtitle: "Sync your hearts and wishlists.",
-            connect: "Connect",
-            inputPlaceholder: "partner@example.com"
+        friends: {
+            title: "Friends",
+            subtitle: "See what your friends are wishing for.",
+            add: "Add Friend",
+            empty: "No friends yet."
         },
         closet: {
             title: "My Closet",
@@ -54,9 +55,10 @@ export const TRANSLATIONS = {
     tr: {
         nav: {
             home: "Listem",
-            partner: "Partner",
+            friends: "Arkadaşlar",
             inspo: "Panolar",
-            closet: "Dolabım"
+            closet: "Dolabım",
+            combos: "Kombinler"
         },
         home: {
             title: "İstek Listem",
@@ -69,11 +71,11 @@ export const TRANSLATIONS = {
             value: "Toplam Değer",
             progress: "İlerleme"
         },
-        partner: {
-            title: "Partner Modu",
-            subtitle: "Kalplerinizi ve listelerinizi eşleyin.",
-            connect: "Bağlan",
-            inputPlaceholder: "partner@ornek.com"
+        friends: {
+            title: "Arkadaşlar",
+            subtitle: "Arkadaşlarının neler istediğini gör.",
+            add: "Arkadaş Ekle",
+            empty: "Henüz arkadaşın yok."
         },
         closet: {
             title: "Dolabım",

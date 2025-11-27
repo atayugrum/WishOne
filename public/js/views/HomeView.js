@@ -2,6 +2,7 @@ import { firestoreService } from '../services/FirestoreService.js';
 import { authService } from '../services/AuthService.js';
 import { CurrencyService } from '../services/CurrencyService.js';
 import { AddItemModal } from '../components/addItemModal.js';
+import { AdSlot } from '../components/AdSlot.js';
 import { CATEGORIES } from '../config/categories.js';
 import { i18n } from '../services/LocalizationService.js';
 
@@ -12,6 +13,8 @@ let currentView = 'grid'; // State: 'grid' or 'timeline'
 function getCountdown(dateString) {
     if (!dateString) return null;
     const target = new Date(dateString);
+    if (isNaN(target.getTime())) return null; // Handle Invalid Date
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     target.setHours(0, 0, 0, 0);
@@ -21,8 +24,13 @@ function getCountdown(dateString) {
     if (diffDays < 0) return { text: "Overdue", class: "tag-overdue", days: diffDays };
     if (diffDays === 0) return { text: "Today!", class: "tag-urgent", days: 0 };
     if (diffDays <= 7) return { text: `${diffDays} days left`, class: "tag-urgent", days: diffDays };
-    if (diffDays <= 30) return { text: `${diffDays} days`, class: "tag-soon", days: diffDays };
-    return { text: `${Math.round(diffDays / 30)} months`, class: "tag-far", days: diffDays };
+    if (diffDays <= 30) return { text: `${diffDays} days left`, class: "tag-soon", days: diffDays };
+
+    // Better Month Logic
+    const months = Math.round(diffDays / 30);
+    if (months <= 1) return { text: "Next Month", class: "tag-far", days: diffDays };
+    if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} years`, class: "tag-far", days: diffDays };
+    return { text: `in ${months} months`, class: "tag-far", days: diffDays };
 }
 
 function getWeeklySavings(price, days) {
@@ -76,6 +84,21 @@ export const HomeView = {
         setTimeout(() => HomeView.loadData(), 0);
 
         return `
+            <!-- Side Banners (Desktop Only) -->
+            ${!authService.isPremium ? `
+                <div class="ad-side-banner left">
+                    <span class="ad-badge">Sponsored</span>
+                    <h3>WishOne Premium</h3>
+                    <p>Remove ads & unlock more!</p>
+                    <button class="btn-primary btn-sm" onclick="authService.upgradeToPremium().then(() => window.location.reload())" style="font-size:0.8rem; padding:8px 16px;">Upgrade</button>
+                </div>
+                <div class="ad-side-banner right">
+                    <span class="ad-badge">Ad</span>
+                    <h3>Cool Product</h3>
+                    <p>Check this out!</p>
+                </div>
+            ` : ''}
+
             <div class="view-header" style="display:flex; align-items:flex-end;">
                 <div>
                     <h1>${i18n.t('home.title')}</h1>
@@ -168,13 +191,33 @@ export const HomeView = {
 
             // --- RENDER LOGIC SWITCH ---
             if (currentView === 'grid') {
-                container.innerHTML = `<div class="masonry-grid">` + items.map(item => HomeView.renderCard(item)).join('') + `</div>`;
+                let gridHtml = '';
+                items.forEach((item, index) => {
+                    gridHtml += HomeView.renderCard(item);
+                    // Inject Ad every 5 items for free users
+                    if (!authService.isPremium && (index + 1) % 5 === 0) {
+                        const ad = new AdSlot();
+                        gridHtml += `<div class="ad-wrapper">${ad.getElement().outerHTML}</div>`;
+                    }
+                });
+                container.innerHTML = `<div class="masonry-grid">` + gridHtml + `</div>`;
+
+                // Re-attach events for ads
+                container.querySelectorAll('.ad-slot #btn-upgrade').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        if (confirm("Upgrade to Premium for $4.99?")) {
+                            await authService.upgradeToPremium();
+                            window.location.reload();
+                        }
+                    });
+                });
+
             } else {
                 container.innerHTML = HomeView.renderTimeline(items);
             }
 
         } catch (error) {
-            container.innerHTML = `<p class="error">Error loading data.</p>`;
+            console.error("HomeView Load Error:", error);
         }
     },
 
@@ -198,12 +241,22 @@ export const HomeView = {
             }
         }
 
+        // Discount Badge Logic
+        let discountBadge = '';
+        if (item.onSale && item.originalPrice && item.price < item.originalPrice) {
+            const discount = Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100);
+            if (discount > 0) {
+                discountBadge = `<div class="discount-badge">-${discount}%</div>`;
+            }
+        }
+
         return `
             <article class="glass-panel card" data-id="${item.id}">
                 <button class="card-action-btn delete-btn" onclick="window.handleDeleteItem('${item.id}')">&times;</button>
                 <button class="card-action-btn closet-btn" onclick="window.handleMoveToCloset('${item.id}')">✔</button>
                 <div class="card-img-container">
                     ${timeBadge}
+                    ${discountBadge}
                     <img src="${item.imageUrl}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
                 </div>
                 <div class="card-content">

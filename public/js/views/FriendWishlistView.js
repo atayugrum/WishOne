@@ -1,12 +1,13 @@
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
-import { CATEGORIES } from '../config/categories.js'; // NEW
-import { i18n } from '../services/LocalizationService.js'; // NEW
+import { CATEGORIES } from '../config/categories.js';
+import { i18n } from '../services/LocalizationService.js';
 
 // Helper: Calculate days left (Same as HomeView)
 function getCountdown(dateString) {
     if (!dateString) return null;
     const target = new Date(dateString);
+    if (isNaN(target.getTime())) return null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     target.setHours(0, 0, 0, 0);
@@ -20,68 +21,23 @@ function getCountdown(dateString) {
     return { text: `${Math.round(diffDays / 30)} months`, class: "tag-far", days: diffDays };
 }
 
-export const PartnerView = {
+export const FriendWishlistView = {
     render: async () => {
         const user = authService.currentUser;
-        const profile = authService.userProfile;
+        const friendId = sessionStorage.getItem('currentFriendId');
 
-        if (!user || !profile) return `<div class="view-header"><h1>Loading...</h1></div>`;
-
-        // STATE 1: ALREADY CONNECTED
-        if (profile.partnerId) {
-            return await PartnerView.renderPartnerList(profile.partnerId);
+        if (!user) return `<div class="view-header"><h1>Login Required</h1></div>`;
+        if (!friendId) {
+            window.location.hash = '#/friends';
+            return '';
         }
 
-        // STATE 2: NOT CONNECTED
-        window.handleLinkPartner = async () => {
-            const emailInput = document.getElementById('partner-email');
-            const btn = document.getElementById('btn-link');
-            const email = emailInput.value.trim();
+        const [friendProfile, items] = await Promise.all([
+            firestoreService.getUserProfile(friendId),
+            firestoreService.getWishlist(friendId)
+        ]);
 
-            if (!email) return;
-
-            try {
-                btn.textContent = "Searching...";
-                btn.disabled = true;
-                await firestoreService.linkPartner(user.uid, email);
-                alert("Connected! Refreshing...");
-                window.location.reload();
-            } catch (error) {
-                alert(error.message);
-                btn.textContent = i18n.t('partner.connect');
-                btn.disabled = false;
-            }
-        };
-
-        return `
-            <div class="view-header">
-                <h1>${i18n.t('partner.title')}</h1>
-                <p>${i18n.t('partner.subtitle')}</p>
-            </div>
-
-            <div class="glass-panel" style="max-width: 500px; margin: 40px auto; padding: 40px; text-align: center;">
-                <div style="font-size: 60px; margin-bottom: 20px;">❤️</div>
-                <h3 style="margin-bottom: 16px;">${i18n.t('partner.connect')}</h3>
-                <p style="color: var(--text-secondary); margin-bottom: 32px;">
-                    Enter your partner's email address to sync accounts.
-                </p>
-
-                <div class="form-group">
-                    <input type="email" id="partner-email" placeholder="${i18n.t('partner.inputPlaceholder')}" style="text-align: center;">
-                </div>
-
-                <button id="btn-link" class="btn-primary" style="width: 100%; margin-top: 16px;" onclick="window.handleLinkPartner()">
-                    ${i18n.t('partner.connect')}
-                </button>
-            </div>
-        `;
-    },
-
-    renderPartnerList: async (partnerId) => {
-        const currentUser = authService.currentUser;
-        const partnerProfile = await firestoreService.getUserProfile(partnerId);
-        const partnerName = partnerProfile ? partnerProfile.displayName : "Partner";
-        const items = await firestoreService.getWishlist(partnerId);
+        const friendName = friendProfile ? friendProfile.displayName : "Friend";
 
         // --- OPTIMISTIC UI UPDATE LOGIC ---
         window.handleGiftItem = async (itemId, currentClaimedBy) => {
@@ -111,11 +67,11 @@ export const PartnerView = {
                     }
 
                     // Update onclick to be an unclaim action
-                    btn.onclick = () => window.handleGiftItem(itemId, currentUser.uid);
+                    btn.onclick = () => window.handleGiftItem(itemId, user.uid);
 
                 } else {
                     // APPLY UNCLAIMED STATE
-                    if (currentClaimedBy !== currentUser.uid) {
+                    if (currentClaimedBy !== user.uid) {
                         alert("Someone else is already getting this!");
                         return;
                     }
@@ -130,9 +86,7 @@ export const PartnerView = {
                 }
 
                 // 2. Perform API Call
-                await firestoreService.toggleClaimItem(itemId, currentUser.uid, currentClaimedBy);
-
-                // Success! No need to do anything else.
+                await firestoreService.toggleClaimItem(itemId, user.uid, currentClaimedBy);
 
             } catch (error) {
                 console.error("Claim failed:", error);
@@ -146,7 +100,6 @@ export const PartnerView = {
                 } else if (!isClaiming && existingBadge) {
                     card.prepend(existingBadge);
                 }
-                // Revert click handler (tricky, but reloading is safer if state desyncs)
                 window.location.reload();
             }
         };
@@ -154,13 +107,14 @@ export const PartnerView = {
         if (items.length === 0) {
             return `
                 <div class="view-header">
-                    <h1>${partnerName}'s Wishlist</h1>
+                    <button class="btn-text" onclick="window.location.hash='#/friends'" style="margin-bottom:16px;">← Back to Friends</button>
+                    <h1>${friendName}'s Wishlist</h1>
                     <p class="empty-state">No wishes yet.</p>
                 </div>`;
         }
 
         const gridContent = items.map(item => {
-            const isClaimedByMe = item.claimedBy === currentUser.uid;
+            const isClaimedByMe = item.claimedBy === user.uid;
             const isClaimedByOther = item.claimedBy && !isClaimedByMe;
 
             // Styles
@@ -221,7 +175,10 @@ export const PartnerView = {
 
         return `
             <div class="view-header">
-                <h1>${partnerName}'s Wishlist</h1>
+                <div style="margin-bottom:16px;">
+                    <button class="btn-text" onclick="window.location.hash='#/friends'">← Back to Friends</button>
+                </div>
+                <h1>${friendName}'s Wishlist</h1>
                 <p>Pick a gift. Keep it a surprise.</p>
             </div>
             <div class="masonry-grid">

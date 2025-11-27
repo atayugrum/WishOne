@@ -1,13 +1,28 @@
-# Node modules (ileride npm kullanırsan)
+# Node / backend
 node_modules/
+functions/node_modules/
+server/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Env files (API key'ler vs)
+# Env / secrets
 .env
+.env.*
+*.env
 .env.local
-.env.*.local
+.env.development.local
+.env.production.local
 
-# VS Code config
+server/.env
+server/.env.*
+server/*.env
+
+# Firebase / service account
+serviceAccount*.json
+firebase-debug.log
+
+# Editor / OS
 .vscode/
-
-# Mac vs için
 .DS_Store
+.idea/
