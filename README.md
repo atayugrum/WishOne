@@ -1,127 +1,254 @@
-# WishOne – Zen Social Wishlist
+# WishOne — A Zen Wishlist for Friends (Part of the AtOne Ecosystem)
 
-WishOne is a **zen, glassmorphic wishlist web app** that lets you:
-- Save things you want,
-- Share them with friends,
-- Secretly claim gifts,
-- Get AI-assisted suggestions when adding items.
+WishOne is a **friends-based, AI-assisted wishlist web app** built as part of the **AtOne** ecosystem.
 
-It’s built as a **Vanilla JavaScript SPA + Firebase + Node backend**, with an Apple-like, soft UI and Pinterest-style layouts.
-
----
-
-## ✨ Core Features (Current v2 State)
-
-### 1. Friend-based wishlists (social model)
-- Move away from a single “partner” into a **friends network**.
-- Add friends (by email/username, depending on config) and see their wishlists.
-- Each friend has their own wishlist view.
-
-### 2. Magic Add (URL → item, AI-assisted)
-- Paste a product URL and let **Magic Add**:
-  - Scrape the page on the backend (title, image, price where possible),
-  - Pre-fill the add-item form for you,
-  - Use AI to clean up the title and suggest category/subcategory (beta),
-  - Try to normalize price formats for TRY/EUR (still being improved).
-- If something is missing or parsed badly, you can always edit manually.
-
-### 3. Edit flow (fix wrong data easily)
-- Each wishlist item has an **Edit (✎)** action.
-- Reuses the same glassmorphic modal as Magic Add.
-- Saves updates through a full `updateItem` flow in Firestore.
-
-### 4. Secret gifting (Surprise Protocol)
-- When you view a friend’s wishlist:
-  - You see a **Gift / 🎁** action instead of destructive actions.
-  - Claiming it sets `claimedBy` on that item.
-- For you (the gifter):
-  - The card becomes **gold / “reserved by you”**.
-- For your friend (the owner):
-  - The item looks normal—no hint that it’s already claimed.
-
-### 5. Closet – owned items
-- Items that you mark as **owned** move into the **Closet**.
-- Closet has a softer, “museum-like” view of things that are already manifested.
-- Useful for outfit building and tracking what you already have.
-
-### 6. Inspo Boards (Pinterest-style)
-- Create **boards** (e.g. “Summer 2026”, “Home Decor”) and pin pure images.
-- Boards act like visual moodboards: no price or heavy UI, just images.
-- Uses a masonry layout for a Pinterest-like feel.
-
-### 7. Combo Builder (beta)
-- A dedicated **Combo view** for creating simple outfits/combos from Closet items.
-- Persists combos in Firestore (e.g. “Date Night”, “Office Fit”).
-- Currently a **beta feature** – UX and AI integration will be iterated further.
-
-### 8. Multi-auth & profile model
-- Authentication via:
-  - **Google Sign-In**
-  - **Email & Password**
-- User profiles in Firestore support:
-  - Display name
-  - Username (for friend search)
-  - Email
-  - Extra fields for future personalization (e.g. birthdate, plan).
-
-### 9. Basic plans & ads scaffolding
-- Data model supports **`plan`** (e.g. `"free"`, `"premium"`).
-- An `AdSlot` component exists for in-app ad placements.
-- Currently used as scaffolding for:
-  - Future freemium limits (AI usage, price tracking),
-  - Basic banner placements without breaking the layout.
-
-### 10. AI helpers (early)
-- Backend-connected **AIService** that:
-  - Helps clean product titles,
-  - Suggests categories/subcategories (where possible),
-  - Provides **priority hints** (e.g. “must-have” vs “nice-to-have”) – still being refined.
-- All AI calls are proxied via the Node backend (no API keys in the frontend).
-
-### 11. Design system
-- **Animated pastel gradient background** (Lavender, Pink, Blue, Peach).
-- Heavy **Glassmorphism**:
-  - Frosted cards, floating header, rounded modals.
-- Typography:
-  - `Urbanist` for titles,
-  - `Inter` for body text.
-- **Love Mode** toggle:
-  - Warmer palette and subtle heart effects for a more romantic vibe.
-- Fully responsive, mobile-first layout.
+It’s designed to feel like a **native Apple experience** in the browser:
+- Soft, animated pastel background
+- Glassmorphism cards and modals
+- Calm, emotional microinteractions
+- Clean flows for adding, organizing and “manifesting” what you want
 
 ---
 
-## 🧱 Tech Stack & Architecture
+## 1. Core Concept
+
+WishOne is **not** just a product list.
+
+It’s a **social manifestation system** where:
+- You save things you want (with images, prices, categories, deadlines)
+- Your friends can see your wishes and secretly “claim” gifts
+- AI helps you prioritize, categorize and plan
+- Over time, your “Closet” becomes a museum of things you actually manifested
+
+---
+
+## 2. Current Feature Set
+
+### 2.1 Auth & Profile
+
+- **Multi-auth support**
+  - Google Sign-In
+  - Email & Password sign-up/login
+- User profile data stored in Firestore:
+  - `displayName`, `email`, optional `photoURL`
+  - Basic profile meta reserved for future features (username, birthday, plan type etc.)
+
+> Note: Phone auth & full profile onboarding are planned but not fully implemented yet.
+
+---
+
+### 2.2 Social Layer – Friends, Not Just Couples
+
+- The old **“Partner”** model has been replaced with a **friends-based model**:
+  - Add friends by email
+  - See their public wishlists
+  - Navigate via:
+    - **FriendsView** — list of your friends
+    - **FriendWishlistView** — selected friend’s wishlist
+
+- **Secret gifting**:
+  - When you view a friend’s wishlist, you can “claim” an item as a gift.
+  - For you (gifter): the card gets a “reserved” / gifted state.
+  - For your friend (owner): the item still looks normal — surprise preserved.
+
+---
+
+### 2.3 Wishlist & Items
+
+- **My Wishlist (HomeView)**:
+  - Masonry-style grid layout with glass cards
+  - Each card shows:
+    - Image
+    - Title
+    - Price & currency
+    - Category & subcategory
+    - Optional target date (deadline)
+  - “Closet” toggle to mark items as **owned/manifested**
+
+- **Full edit flow**:
+  - Existing items can be edited:
+    - Title, price, currency
+    - Category / subcategory
+    - Target date
+    - Image URL
+  - Edit uses the same smooth modal UI as “Add Item”.
+
+- **ClosetView**:
+  - Shows items marked as `isOwned = true`
+  - Visual style:
+    - Slightly desaturated/softened
+    - Meant to feel like a “manifested gallery” rather than an active wishlist
+
+---
+
+### 2.4 Magic Add 2.0 (Backend-Assisted)
+
+- **Magic Add** lets users paste a product URL instead of manually entering everything:
+  - The Node.js backend fetches product metadata (title, image, price) using scraping.
+  - Basic normalization fixes price formats (`,` vs `.` and currency symbols).
+  - Data is then saved in Firestore and rendered in the UI.
+
+- UI states:
+  - While fetching:
+    - Inline loading state in the modal (“Fetching details…”)
+  - On success:
+    - Fields auto-fill and animate in.
+  - On error:
+    - Friendly message and manual input fallback.
+
+> The exact scraping provider / method may be iterated over, but the flow is in place.
+
+---
+
+### 2.5 AI Assistance
+
+AI is integrated via a backend service (Gemini-based):
+
+- **Priority insight (in progress)**:
+  - For Magic Add items, AI can suggest:
+    - A priority (e.g. “High / Need soon” vs “Low / Nice to have”)
+    - A short reason (“You already have similar items”, “Price is high vs your other wishes”, etc.)
+
+- **Planned AI helpers**:
+  - Budget/savings helper (how to plan saving for upcoming items)
+  - Smart combo suggestions for outfits
+  - Smarter categorization & title cleanup for Magic Add
+
+> Some AI paths are partially wired; fine-tuning is ongoing.
+
+---
+
+### 2.6 Combo Builder
+
+- **ComboView** (early version):
+  - Uses items marked as owned (`isOwned = true`) as a “wardrobe”.
+  - Allows creating simple **virtual combos/outfits** by selecting multiple owned items.
+  - Combos are saved in Firestore for later reference.
+
+This is the foundation for richer “style board” and outfit-planning experiences.
+
+---
+
+### 2.7 Ads & Freemium Foundation
+
+- **AdSlot component**:
+  - Injects ad placeholders for free users.
+  - Built to be compatible with real ad networks later (e.g. AdSense).
+  - Premium users (later) will see no ads.
+
+- **Plan awareness in data model**:
+  - The Firestore user document supports:
+    - `plan: "free" | "premium"` (and possible future tiers).
+  - Logic will progressively use this to:
+    - Limit advanced AI calls for free users,
+    - Hide ads for premium users,
+    - Unlock extra features (price tracking alerts, etc.).
+
+---
+
+## 3. UI / UX & Motion (Latest Improvements)
+
+The most recent work focused on **polishing the UI/UX and animations**, especially in the context of the AtOne + Apple-like experience:
+
+### 3.1 Global Motion
+
+- Introduced consistent easing curves and durations for transitions:
+  - Fast microinteractions (e.g. button taps)
+  - Smooth view transitions (e.g. Home ↔ Friends ↔ Inspo)
+- View changes now feel more like **“screens in an app”** rather than hard page reloads.
+
+### 3.2 Cards & Microinteractions
+
+- Wishlist cards:
+  - Subtle hover “lift” (translate + slight scale)
+  - Action buttons (delete/gift/closet) appear with soft fade & scale.
+- Owned / gifted / locked states:
+  - More consistent use of color and glow, keeping everything premium and calm.
+
+### 3.3 Modals & Magic Add UX
+
+- Add/Edit item modal:
+  - Smoother open/close transitions (scale + opacity).
+  - Better focus styles on inputs (glass + accent glow).
+- Magic Add:
+  - Clearer feedback while fetching from URL.
+  - Better error messaging without blocking the user.
+
+### 3.4 Empty & Loading States (Foundations)
+
+- Skeleton loaders for content-heavy views.
+- Basic empty states in views like Inspo, Closet, Friends, Combo to avoid “hard blank” screens.
+
+More AtOne-flavored copy and illustrations are planned as next UX polish steps.
+
+---
+
+## 4. Tech Stack
 
 - **Frontend**
-  - Vanilla JavaScript (ES modules)
-  - Pure CSS (no Tailwind/Bootstrap)
-  - SPA-style routing using a simple Router
-  - Files live under: `public/`
-    - `index.html`
-    - `css/variables.css`, `css/main.css`, `css/components.css`
-    - `js/app.js`, `js/services/*`, `js/views/*`, `js/components/*`
+  - Vanilla JavaScript (ES6 modules)
+  - SPA pattern with a simple Router
+  - CSS:
+    - Custom pastel mesh background
+    - Glassmorphism cards and modals
+    - Components split into `main.css` and `components.css`
 
 - **Backend**
-  - Node.js (Express-style API in `server/`)
-  - Responsibilities:
-    - Scraping product pages for Magic Add
-    - Normalizing price text → numeric value
-    - Proxying calls to Gemini (AI) safely
-    - (Soon) scheduled tasks like daily price checks
+  - Node.js backend server for:
+    - Magic Add metadata fetching
+    - AI (Gemini) integration
+    - Currency & formatting helpers
 
 - **Firebase**
+  - Cloud Firestore
   - Firebase Auth (Google + Email/Password)
-  - Cloud Firestore (NoSQL)
-  - Collections:
-    - `users` – profile, plan, friend relationships
-    - `items` – wishlist entries
-    - `boards` – inspo boards
-    - (Nested collections for pins / combos, depending on version)
+  - Firebase Hosting (static assets)
+
+> No frontend frameworks (no React/Vue), no CSS frameworks (no Tailwind/Bootstrap), by design.
 
 ---
 
-## 🚀 Getting Started (Local Dev)
+## 5. Project Structure (High Level)
+
+```text
+/public
+  index.html
+  /css
+    variables.css
+    main.css
+    components.css
+  /js
+    app.js
+    Router.js
+    /config
+      firebase-config.js
+      locales.js
+      api.js        # backend endpoints / constants
+    /services
+      AuthService.js
+      FirestoreService.js
+      CurrencyService.js
+      AIService.js
+    /components
+      Header.js
+      AddItemModal.js
+      AdSlot.js
+    /views
+      WelcomeView.js
+      HomeView.js
+      FriendsView.js
+      FriendWishlistView.js
+      InspoView.js
+      ClosetView.js
+      ComboView.js
+
+/server
+  # Node backend for Magic Add, AI, etc.
+```
+
+---
+
+## 6. Getting Started (Dev)
 
 1. **Clone the repo**
 
@@ -130,65 +257,47 @@ It’s built as a **Vanilla JavaScript SPA + Firebase + Node backend**, with an 
    cd WishOne
    ```
 
-2. **Firebase setup**
-   - Create a Firebase project (if you don’t have one).
-   - Enable:
-     - **Authentication** (Google + Email/Password),
-     - **Cloud Firestore**.
-   - Put your Firebase config into `public/js/config/firebase-config.js` (follow the existing template in the repo).
-
-3. **Backend setup**
+2. **Install server dependencies**
 
    ```bash
    cd server
    npm install
    ```
 
-   - Create a `.env` file with your secrets, e.g.:
-     - Gemini API key
-     - Any scraping-related secrets if needed.
-   - Run the backend:
-     - `npm run dev` or `npm start` (depending on the scripts defined in `package.json`).
+3. **Configure environment**
 
-4. **Frontend dev**
+   - Add your Firebase config in `/public/js/config/firebase-config.js`.
+   - Add backend/API keys (e.g. Gemini) in server `.env` and `/public/js/config/api.js` if needed.
 
-   - From the project root, you can either:
-     - Serve `public/` with a simple static server like:
+4. **Run backend locally**
 
-       ```bash
-       npx serve public
-       ```
+   ```bash
+   cd server
+   npm start
+   # or npm run dev
+   ```
 
-     - or use VS Code’s **Live Server** extension on `public/index.html`.
+5. **Serve frontend**
 
-5. **Open in browser**
-
-   - Go to the URL from your static server (often `http://localhost:3000` or `http://127.0.0.1:5500/public` depending on your setup).
-   - Log in, add some wishes, invite a friend, and try Magic Add.
+   - Use a simple static server from `/public` (e.g. VS Code Live Server, `npx serve public`, or Firebase Hosting emulators).
 
 ---
 
-## 🧭 Roadmap (short)
+## 7. Roadmap / Next Steps
 
-These are planned / partially implemented and will be iterated next:
+Planned upcoming work includes:
 
-- **Daily price refresh** for Premium users (automatic sale detection).
-- **More robust AI priority & subcategory mapping** for Magic Add.
-- **Deeper AI helpers**:
-  - Outfit suggestions from Closet
-  - Budget-based purchase planning
-- **Stronger freemium model**:
-  - Clear limits for Free,
-  - Perks for Premium,
-  - Proper ad integration.
+- Daily price refresh & **sale alerts** (especially for Premium users)
+- More robust **AI helpers**:
+  - Budget planning
+  - Outfit / combo suggestions
+  - Smarter categorization
+- Proper **Free vs Premium** feature split and paywall UX
+- **Ads integration** with a real network (e.g. Google AdSense)
+- Deep AtOne-level onboarding, empty states and emotional copywriting
 
 ---
 
-## 📝 Development Notes
+## 8. License
 
-- No front-end frameworks: this is intentionally **framework-free Vanilla JS**.
-- Services/Views/Components split:
-  - `services/` handle data & logic,
-  - `views/` render screens,
-  - `components/` encapsulate reusable UI pieces.
-- Designed to feel like a **small, personal Apple-quality product**, not a generic CRUD app.
+TBD (personal project / closed source for now, unless decided otherwise).
