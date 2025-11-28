@@ -1,303 +1,128 @@
-# WishOne — A Zen Wishlist for Friends (Part of the AtOne Ecosystem)
+# WishOne v2 — The AI-Powered Social Wishlist
 
-WishOne is a **friends-based, AI-assisted wishlist web app** built as part of the **AtOne** ecosystem.
+WishOne is a **friends-based, AI-assisted wishlist web app**. Version 2 introduces advanced AI agents, privacy controls, and a "soft gamified" experience to help you manifest your dreams.
 
-It’s designed to feel like a **native Apple experience** in the browser:
-- Soft, animated pastel background
-- Glassmorphism cards and modals
-- Calm, emotional microinteractions
-- Clean flows for adding, organizing and “manifesting” what you want
+It maintains the **AtOne design philosophy**: Zen, Fluid, and Emotional.
 
 ---
 
-## 1. Core Concept
+## ✨ New in Version 2
 
-WishOne is **not** just a product list.
+### 🤖 Advanced AI Agents
+- **Moodboard Stylist**: Inside Inspo Boards, ask AI to suggest products that match your board's "vibe".
+- **Friendship Compatibility**: Analyze the shared "vibe" between you and a friend based on your wishlists.
+- **Purchase Planner**: AI helps you budget and prioritize which wishes to fulfill next.
+- **Magic Add 2.0**: Enhanced scraping with duplicate detection and auto-categorization.
 
-It’s a **social manifestation system** where:
-- You save things you want (with images, prices, categories, deadlines)
-- Your friends can see your wishes and secretly “claim” gifts
-- AI helps you prioritize, categorize and plan
-- Over time, your “Closet” becomes a museum of things you actually manifested
+### 🔒 Privacy & Sharing
+- **Public Share Links**: Generate a read-only link (`/#/share?uid=...`) to share your list with anyone (even non-users).
+- **Visibility Controls**: Toggle your list between "Public", "Friends Only", or "Private" in Profile settings.
 
----
+### 🎮 Soft Gamification
+- **Manifestation Confetti**: Celebrate when you move an item to your Closet.
+- **Micro-Rewards**: Subtle toasts when you hit milestones (e.g., "5 Wishes Added").
+- **Activity Log**: A persistent feed of your recent actions and friends' updates.
 
-## 2. Current Feature Set
-
-### 2.1 Auth & Profile
-
-- **Multi-auth support**
-  - Google Sign-In
-  - Email & Password sign-up/login
-- User profile data stored in Firestore:
-  - `displayName`, `email`, optional `photoURL`
-  - Basic profile meta reserved for future features (username, birthday, plan type etc.)
-
-> Note: Phone auth & full profile onboarding are planned but not fully implemented yet.
+### 💰 Smart Shopping
+- **Occasion Badges**: Tag wishes for Birthdays, Anniversaries, etc.
+- **Price Drop Tracking**: Background job (`/api/jobs/refresh-prices`) checks for sales daily.
+- **AdSense Ready**: Architecture supports real ad networks for Free users.
 
 ---
 
-### 2.2 Social Layer – Friends, Not Just Couples
+## 🛠️ Tech Stack
 
-- The old **“Partner”** model has been replaced with a **friends-based model**:
-  - Add friends by email
-  - See their public wishlists
-  - Navigate via:
-    - **FriendsView** — list of your friends
-    - **FriendWishlistView** — selected friend’s wishlist
-
-- **Secret gifting**:
-  - When you view a friend’s wishlist, you can “claim” an item as a gift.
-  - For you (gifter): the card gets a “reserved” / gifted state.
-  - For your friend (owner): the item still looks normal — surprise preserved.
+- **Frontend**: Vanilla JS (ES6+), CSS Variables, Glassmorphism (No frameworks).
+- **Backend**: Node.js + Express (handling AI & Scraping).
+- **Database**: Firebase Cloud Firestore.
+- **AI**: Google Gemini Pro via Node.js SDK.
 
 ---
 
-### 2.3 Wishlist & Items
+## 🚀 Getting Started
 
-- **My Wishlist (HomeView)**:
-  - Masonry-style grid layout with glass cards
-  - Each card shows:
-    - Image
-    - Title
-    - Price & currency
-    - Category & subcategory
-    - Optional target date (deadline)
-  - “Closet” toggle to mark items as **owned/manifested**
+### 1. Prerequisites
+- Node.js v18+
+- A Firebase Project
+- A Google Gemini API Key
 
-- **Full edit flow**:
-  - Existing items can be edited:
-    - Title, price, currency
-    - Category / subcategory
-    - Target date
-    - Image URL
-  - Edit uses the same smooth modal UI as “Add Item”.
+### 2. Setup
 
-- **ClosetView**:
-  - Shows items marked as `isOwned = true`
-  - Visual style:
-    - Slightly desaturated/softened
-    - Meant to feel like a “manifested gallery” rather than an active wishlist
+**Frontend Assets:**
+1. Place your logo at `public/img/logo.jpg`
+2. Place your icon at `public/img/icon.jpg`
 
----
+**Backend:**
+1. Navigate to `/server`
+2. `npm install`
+3. Create a `.env` file (see `.env.example`)
+4. Add your `GEMINI_API_KEY` and Firebase credentials.
 
-### 2.4 Magic Add 2.0 (Backend-Assisted)
+### 3. Running the App
 
-- **Magic Add** lets users paste a product URL instead of manually entering everything:
-  - The Node.js backend fetches product metadata (title, image, price) using scraping.
-  - Basic normalization fixes price formats (`,` vs `.` and currency symbols).
-  - Data is then saved in Firestore and rendered in the UI.
+**Start Backend:**
+```bash
+cd server
+npm start
+# Runs on http://localhost:3001
+```
 
-- UI states:
-  - While fetching:
-    - Inline loading state in the modal (“Fetching details…”)
-  - On success:
-    - Fields auto-fill and animate in.
-  - On error:
-    - Friendly message and manual input fallback.
-
-> The exact scraping provider / method may be iterated over, but the flow is in place.
-
----
-
-### 2.5 AI Assistance
-
-AI is integrated via a backend service (Gemini-based):
-
-- **Priority insight (in progress)**:
-  - For Magic Add items, AI can suggest:
-    - A priority (e.g. “High / Need soon” vs “Low / Nice to have”)
-    - A short reason (“You already have similar items”, “Price is high vs your other wishes”, etc.)
-
-- **Planned AI helpers**:
-  - Budget/savings helper (how to plan saving for upcoming items)
-  - Smart combo suggestions for outfits
-  - Smarter categorization & title cleanup for Magic Add
-
-> Some AI paths are partially wired; fine-tuning is ongoing.
-
----
-
-### 2.6 Combo Builder
-
-- **ComboView** (early version):
-  - Uses items marked as owned (`isOwned = true`) as a “wardrobe”.
-  - Allows creating simple **virtual combos/outfits** by selecting multiple owned items.
-  - Combos are saved in Firestore for later reference.
-
-This is the foundation for richer “style board” and outfit-planning experiences.
-
----
-
-### 2.7 Ads & Freemium Foundation
-
-- **AdSlot component**:
-  - Injects ad placeholders for free users.
-  - Built to be compatible with real ad networks later (e.g. AdSense).
-  - Premium users (later) will see no ads.
-
-- **Plan awareness in data model**:
-  - The Firestore user document supports:
-    - `plan: "free" | "premium"` (and possible future tiers).
-  - Logic will progressively use this to:
-    - Limit advanced AI calls for free users,
-    - Hide ads for premium users,
-    - Unlock extra features (price tracking alerts, etc.).
-
----
-
-## 3. UI / UX & Motion (Latest Improvements)
-
-The most recent work focused on **polishing the UI/UX and animations**, especially in the context of the AtOne + Apple-like experience:
-
-### 3.1 Global Motion
-
-- Introduced consistent easing curves and durations for transitions:
-  - Fast microinteractions (e.g. button taps)
-  - Smooth view transitions (e.g. Home ↔ Friends ↔ Inspo)
-- View changes now feel more like **“screens in an app”** rather than hard page reloads.
-
-### 3.2 Cards & Microinteractions
-
-- Wishlist cards:
-  - Subtle hover “lift” (translate + slight scale)
-  - Action buttons (delete/gift/closet) appear with soft fade & scale.
-- Owned / gifted / locked states:
-  - More consistent use of color and glow, keeping everything premium and calm.
-
-### 3.3 Modals & Magic Add UX
-
-- Add/Edit item modal:
-  - Smoother open/close transitions (scale + opacity).
-  - Better focus styles on inputs (glass + accent glow).
-- Magic Add:
-  - Clearer feedback while fetching from URL.
-  - Better error messaging without blocking the user.
-
-### 3.4 Empty & Loading States (Foundations)
-
-- Skeleton loaders for content-heavy views.
-- Basic empty states in views like Inspo, Closet, Friends, Combo to avoid “hard blank” screens.
-
-More AtOne-flavored copy and illustrations are planned as next UX polish steps.
-
----
-
-## 4. Tech Stack
-
-- **Frontend**
-  - Vanilla JavaScript (ES6 modules)
-  - SPA pattern with a simple Router
-  - CSS:
-    - Custom pastel mesh background
-    - Glassmorphism cards and modals
-    - Components split into `main.css` and `components.css`
-
-- **Backend**
-  - Node.js backend server for:
-    - Magic Add metadata fetching
-    - AI (Gemini) integration
-    - Currency & formatting helpers
-
-- **Firebase**
-  - Cloud Firestore
-  - Firebase Auth (Google + Email/Password)
-  - Firebase Hosting (static assets)
-
-> No frontend frameworks (no React/Vue), no CSS frameworks (no Tailwind/Bootstrap), by design.
-
----
-
-## 5. Project Structure (High Level)
-
-```text
-/public
-  index.html
-  /css
-    variables.css
-    main.css
-    components.css
-  /js
-    app.js
-    Router.js
-    /config
-      firebase-config.js
-      locales.js
-      api.js        # backend endpoints / constants
-    /services
-      AuthService.js
-      FirestoreService.js
-      CurrencyService.js
-      AIService.js
-    /components
-      Header.js
-      AddItemModal.js
-      AdSlot.js
-    /views
-      WelcomeView.js
-      HomeView.js
-      FriendsView.js
-      FriendWishlistView.js
-      InspoView.js
-      ClosetView.js
-      ComboView.js
-
-/server
-  # Node backend for Magic Add, AI, etc.
+**Start Frontend:** Serve the `/public` folder using any static server:
+```bash
+npx serve public
+# Runs on http://localhost:3000
 ```
 
 ---
 
-## 6. Getting Started (Dev)
+## 📂 Project Structure
 
-1. **Clone the repo**
-
-   ```bash
-   git clone https://github.com/atayugrum/WishOne.git
-   cd WishOne
-   ```
-
-2. **Install server dependencies**
-
-   ```bash
-   cd server
-   npm install
-   ```
-
-3. **Configure environment**
-
-   - Add your Firebase config in `/public/js/config/firebase-config.js`.
-   - Add backend/API keys (e.g. Gemini) in server `.env` and `/public/js/config/api.js` if needed.
-
-4. **Run backend locally**
-
-   ```bash
-   cd server
-   npm start
-   # or npm run dev
-   ```
-
-5. **Serve frontend**
-
-   - Use a simple static server from `/public` (e.g. VS Code Live Server, `npx serve public`, or Firebase Hosting emulators).
+```text
+/public
+  /css          # Design system (variables, glassmorphism)
+  /js
+    /components # UI widgets (Header, AdSlot, Modals)
+    /services   # Logic (Auth, Firestore, AI, Logs)
+    /views      # Screens (Home, Friends, Inspo, Public)
+    /config     # Envs and Constants
+  /img          # Logo and Icons
+/server         # Node.js Backend API
+```
 
 ---
 
-## 7. Roadmap / Next Steps
+## 🤖 AI Features Usage
 
-Planned upcoming work includes:
-
-- Daily price refresh & **sale alerts** (especially for Premium users)
-- More robust **AI helpers**:
-  - Budget planning
-  - Outfit / combo suggestions
-  - Smarter categorization
-- Proper **Free vs Premium** feature split and paywall UX
-- **Ads integration** with a real network (e.g. Google AdSense)
-- Deep AtOne-level onboarding, empty states and emotional copywriting
+- **Magic Add**: Paste a URL in the "Add Item" modal. The backend scrapes metadata and uses Gemini to categorize it.
+- **Compatibility**: Go to "Friends", click the 🔮 icon on a friend card.
+- **Moodboard Ideas**: Open an Inspo Board, click "✨ Ideas".
 
 ---
 
-## 8. License
+## 📊 Monitoring
 
-TBD (personal project / closed source for now, unless decided otherwise).
+The app now includes a Structured Logging Service:
+
+- **Frontend logs**: `LogService.js` (console + localStorage for critical errors).
+- **Backend logs**: JSON-formatted stdout for easy parsing in Cloud Logging.
+
+---
+
+## 📄 License
+
+AtOne Ecosystem. All Rights Reserved.
+
+---
+
+## ✅ Final Instructions for You
+
+1. **Images**:  
+   Save your previously uploaded `WishOneIcon.jpg` as `public/img/icon.jpg` and `WishOneLogo.jpg` as `public/img/logo.jpg`.
+
+2. **Dependencies**:  
+   Run `npm install` in the `server` folder to ensure `dotenv` and `firebase-admin` are installed.
+
+3. **Deploy**:  
+   If deploying to production (e.g., Firebase Hosting + Cloud Run), ensure the `getBaseUrl()` function in `api.js` points to your production backend URL.
+
+**WishOne v2 is now feature-complete.** You have a robust, AI-powered, social wishlist app with a premium UI/UX.

@@ -39,6 +39,20 @@ export const FriendWishlistView = {
 
         const friendName = friendProfile ? friendProfile.displayName : "Friend";
 
+        // Privacy Check (Task 2.3)
+        if (friendProfile && friendProfile.isPrivate) {
+            return `
+                <div class="view-header">
+                    <button class="btn-text" onclick="window.location.hash='#/friends'" style="margin-bottom:16px;">← Back</button>
+                </div>
+                <div class="glass-panel empty-state-card">
+                    <span class="empty-icon">🔒</span>
+                    <h3 class="empty-title">Private Wishlist</h3>
+                    <p class="empty-text">${friendName} has made their wishlist private.</p>
+                </div>
+            `;
+        }
+
         // --- OPTIMISTIC UI UPDATE LOGIC ---
         window.handleGiftItem = async (itemId, currentClaimedBy) => {
             const btn = document.querySelector(`[data-gift-btn="${itemId}"]`);
@@ -109,7 +123,11 @@ export const FriendWishlistView = {
                 <div class="view-header">
                     <button class="btn-text" onclick="window.location.hash='#/friends'" style="margin-bottom:16px;">← Back to Friends</button>
                     <h1>${friendName}'s Wishlist</h1>
-                    <p class="empty-state">No wishes yet.</p>
+                </div>
+                <div class="glass-panel empty-state-card">
+                    <span class="empty-icon">📭</span>
+                    <h3 class="empty-title">Nothing Here Yet</h3>
+                    <p class="empty-text">${friendName} hasn't added any wishes yet. Check back later!</p>
                 </div>`;
         }
 

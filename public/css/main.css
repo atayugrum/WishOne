@@ -29,14 +29,11 @@ body {
         radial-gradient(at bottom left, var(--bg-color-3), transparent 50%),
         radial-gradient(at bottom right, var(--bg-color-4), transparent 50%);
 
-    /* Ensure the blur is applied */
     filter: blur(100px);
-
-    /* Hardware acceleration */
     transform: translateZ(0);
+    /* HW Accel */
     will-change: transform, filter;
 
-    /* Split animation properties for better stability */
     animation-name: gradientFlow, colorCycle;
     animation-duration: 25s, 60s;
     animation-timing-function: var(--ease-fluid), linear;
@@ -47,7 +44,6 @@ body {
     transition: background 2s ease-in-out;
 }
 
-/* Movement Animation */
 @keyframes gradientFlow {
     0% {
         transform: rotate(0deg) translate(0, 0);
@@ -58,7 +54,6 @@ body {
     }
 }
 
-/* Color Changing Animation */
 @keyframes colorCycle {
     0% {
         filter: blur(100px) hue-rotate(0deg);
@@ -80,7 +75,7 @@ body {
     transform: translateY(0);
 }
 
-/* --- Text Styles --- */
+/* --- Typography --- */
 h1,
 h2,
 h3 {
@@ -215,5 +210,52 @@ body.mode-love::after {
 
     100% {
         transform: translateY(100vh) rotate(10deg);
+    }
+}
+
+/* --- Task 5.3: Performance & Mobile Optimizations --- */
+
+/* Reduce motion preference */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .ambient-background {
+        animation: none;
+        /* Stop expensive background animation */
+    }
+}
+
+/* Mobile: Reduce Glass Blur cost */
+@media (max-width: 600px) {
+    .ambient-background {
+        filter: blur(60px);
+        /* Lower blur radius */
+    }
+
+    .glass-panel {
+        backdrop-filter: blur(10px);
+        /* Reduce from 20px */
+        -webkit-backdrop-filter: blur(10px);
+    }
+
+    #app {
+        padding-top: 100px;
+        /* Less top padding */
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    /* Hide some heavy header elements on mobile if needed */
+    .nav-link {
+        padding: 6px 10px;
+        font-size: 0.8rem;
     }
 }

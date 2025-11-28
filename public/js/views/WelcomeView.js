@@ -95,7 +95,7 @@ export const WelcomeView = {
                 <div class="glass-panel auth-card">
                     
                     <div class="brand-hero">
-                        <span class="brand-icon">✨</span>
+                        <img src="img/logo.jpg" alt="WishOne Logo" style="width: 120px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); margin-bottom: 24px;">
                         <h1 class="hero-title">WishOne</h1>
                         <p class="hero-subtitle">Zen. Fluid. Emotional.</p>
                     </div>

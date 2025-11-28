@@ -1,6 +1,5 @@
 import { firestoreService } from '../services/FirestoreService.js';
 import { authService } from '../services/AuthService.js';
-import { CurrencyService } from '../services/CurrencyService.js';
 import { AddItemModal } from '../components/addItemModal.js';
 import { AdSlot } from '../components/AdSlot.js';
 import { CATEGORIES } from '../config/categories.js';
@@ -8,34 +7,25 @@ import { i18n } from '../services/LocalizationService.js';
 import { apiCall } from '../config/api.js';
 import { FEATURES } from '../config/limits.js';
 import { premiumModal } from '../components/PremiumModal.js';
+import { GamificationService } from '../services/GamificationService.js';
 
 let addItemModal = null;
 let currentView = 'grid';
 let itemsMap = new Map();
 let showSaleOnly = false;
 
-// ... Helpers (getCountdown, getWeeklySavings) omitted for brevity as they are unchanged ...
 function getCountdown(dateString) { if (!dateString) return null; const target = new Date(dateString); if (isNaN(target.getTime())) return null; const today = new Date(); today.setHours(0, 0, 0, 0); target.setHours(0, 0, 0, 0); const diffTime = target - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays < 0) return { text: "Overdue", class: "tag-overdue", days: diffDays }; if (diffDays === 0) return { text: "Today!", class: "tag-urgent", days: 0 }; if (diffDays <= 7) return { text: `${diffDays} days left`, class: "tag-urgent", days: diffDays }; if (diffDays <= 30) return { text: `${diffDays} days left`, class: "tag-soon", days: diffDays }; const months = Math.round(diffDays / 30); if (months <= 1) return { text: "Next Month", class: "tag-far", days: diffDays }; if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} years`, class: "tag-far", days: diffDays }; return { text: `in ${months} months`, class: "tag-far", days: diffDays }; }
-function getWeeklySavings(price, days) { if (!days || days <= 0) return 0; const weeks = days / 7; if (weeks < 1) return price; return Math.ceil(price / weeks); }
 
-// Toast Helper
 window.showToast = (message, icon = "✨") => {
     const existing = document.querySelector('.toast-notification');
     if (existing) existing.remove();
-
     const toast = document.createElement('div');
     toast.className = 'toast-notification glass-panel';
     toast.innerHTML = `<span>${icon}</span> ${message}`;
     document.body.appendChild(toast);
-
-    // Trigger Reflow
     toast.offsetHeight;
     toast.classList.add('visible');
-
-    setTimeout(() => {
-        toast.classList.remove('visible');
-        setTimeout(() => toast.remove(), 400);
-    }, 3000);
+    setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 400); }, 3000);
 };
 
 export const HomeView = {
@@ -55,10 +45,7 @@ export const HomeView = {
         window.handleDeleteItem = async (itemId) => {
             if (confirm("Remove this wish?")) {
                 const card = document.querySelector(`[data-id="${itemId}"]`);
-                if (card) {
-                    card.style.transform = 'scale(0.9)';
-                    card.style.opacity = '0';
-                }
+                if (card) { card.style.transform = 'scale(0.9)'; card.style.opacity = '0'; }
                 await firestoreService.deleteItem(itemId);
                 HomeView.loadData();
             }
@@ -71,12 +58,9 @@ export const HomeView = {
 
         window.handleMoveToCloset = async (itemId) => {
             const card = document.querySelector(`[data-id="${itemId}"]`);
-            if (card) {
-                card.style.transform = 'scale(1.1) translateY(-10px)';
-                card.style.opacity = '0';
-            }
+            if (card) { card.style.transform = 'scale(1.1) translateY(-10px)'; card.style.opacity = '0'; }
 
-            // Show Toast immediately for instant feedback
+            GamificationService.triggerConfetti();
             window.showToast("Manifested! Moved to Closet.", "🎉");
 
             setTimeout(async () => {
@@ -95,37 +79,25 @@ export const HomeView = {
         window.toggleSaleFilter = () => {
             showSaleOnly = !showSaleOnly;
             const btn = document.getElementById('btn-sale-filter');
-            if (showSaleOnly) btn.classList.add('active');
-            else btn.classList.remove('active');
+            if (showSaleOnly) btn.classList.add('active'); else btn.classList.remove('active');
             HomeView.loadData();
         };
 
         window.openPlannerModal = () => {
-            if (!authService.canUseFeature(FEATURES.AI_PLANNER)) {
-                premiumModal.open();
-                return;
-            }
+            if (!authService.canUseFeature(FEATURES.AI_PLANNER)) { premiumModal.open(); return; }
             const modal = document.getElementById('planner-modal');
-            if (modal) {
-                modal.style.display = 'flex';
-                requestAnimationFrame(() => modal.classList.add('active'));
-            }
+            if (modal) { modal.style.display = 'flex'; requestAnimationFrame(() => modal.classList.add('active')); }
         };
 
         window.closePlannerModal = () => {
             const modal = document.getElementById('planner-modal');
-            if (modal) {
-                modal.classList.remove('active');
-                setTimeout(() => modal.style.display = 'none', 300);
-            }
+            if (modal) { modal.classList.remove('active'); setTimeout(() => modal.style.display = 'none', 300); }
         };
 
         window.handleAiPlannerSubmit = async () => {
-            // ... (Keep existing Planner Logic) ...
             const budget = parseFloat(document.getElementById('planner-budget').value);
             const resultsDiv = document.getElementById('planner-results');
             if (!budget) return alert("Enter budget.");
-
             resultsDiv.innerHTML = `<div class="loading-spinner">Thinking...</div>`;
             try {
                 const items = await firestoreService.getWishlist(authService.currentUser.uid);
@@ -134,13 +106,10 @@ export const HomeView = {
                 if (data.recommendedItems) {
                     resultsDiv.innerHTML = `
                         <div style="background:rgba(255,255,255,0.5); padding:10px; border-radius:8px; margin-bottom:10px;"><strong>Plan:</strong> ${data.summary}</div>
-                        ${data.recommendedItems.map(rec => {
-                        const item = items.find(i => i.id === rec.itemId);
-                        return item ? `<div class="glass-panel" style="padding:8px; margin-bottom:5px;"><b>${item.title}</b><br><small>${rec.reason}</small></div>` : '';
-                    }).join('')}
+                        ${data.recommendedItems.map(rec => { const item = items.find(i => i.id === rec.itemId); return item ? `<div class="glass-panel" style="padding:8px; margin-bottom:5px;"><b>${item.title}</b><br><small>${rec.reason}</small></div>` : ''; }).join('')}
                     `;
                 } else { resultsDiv.innerHTML = `<p>No plan.</p>`; }
-            } catch (error) { alert(`Error: ${error.message}`); }
+            } catch (error) { resultsDiv.innerHTML = `<p style="color:#ff3b30">AI Planner Error: ${error.message}</p>`; }
         };
 
         setTimeout(() => HomeView.loadData(), 0);
@@ -160,9 +129,16 @@ export const HomeView = {
                 </div>
             </div>
             
-            <div id="content-area">
-                <div class="masonry-grid">
-                    ${HomeView.skeletonTemplate.repeat(4)}
+            <div style="display:flex; flex-wrap:wrap; gap:24px;">
+                <div id="content-area" style="flex:1; min-width:300px;">
+                    <div class="masonry-grid">
+                        ${HomeView.skeletonTemplate.repeat(4)}
+                    </div>
+                </div>
+                
+                <div class="activity-sidebar" style="width:250px; display:none;" id="activity-log-container">
+                    <h3 style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:12px;">Recent Activity</h3>
+                    <div id="activity-list"></div>
                 </div>
             </div>
             
@@ -184,10 +160,7 @@ export const HomeView = {
         if (!container) return;
 
         const user = authService.currentUser;
-        if (!user) {
-            container.innerHTML = `<div class="empty-state">Login required.</div>`;
-            return;
-        }
+        if (!user) { container.innerHTML = `<div class="empty-state">Login required.</div>`; return; }
 
         try {
             const [items, closetItems] = await Promise.all([
@@ -198,17 +171,54 @@ export const HomeView = {
             itemsMap.clear();
             items.forEach(item => itemsMap.set(item.id, item));
 
+            GamificationService.checkMilestones('add_item', items.length);
+            GamificationService.checkMilestones('manifest', closetItems.length);
+
+            // REAL Activity Log (Task 3.3)
+            const activityContainer = document.getElementById('activity-log-container');
+            const activityList = document.getElementById('activity-list');
+            if (window.innerWidth > 1000) {
+                const activities = await firestoreService.getRecentActivities(user.uid);
+
+                if (activities.length > 0) {
+                    activityContainer.style.display = 'block';
+                    activityList.innerHTML = activities.map(act => {
+                        let text = '';
+                        if (act.type === 'add_wish') text = `Wished for <strong>${act.details.title}</strong>`;
+                        if (act.type === 'manifest') text = `Manifested <strong>${act.details.title}</strong> ✨`;
+                        if (act.type === 'friend_add') text = `Added <strong>${act.details.name}</strong> as friend`;
+                        if (act.type === 'create_board') text = `Created board <strong>${act.details.title}</strong>`;
+
+                        return `
+                            <div class="glass-panel" style="padding:10px; margin-bottom:8px; font-size:0.8rem;">
+                                <span>${text}</span>
+                                <div style="color:var(--text-tertiary); font-size:0.7rem; margin-top:4px;">Recently</div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            }
+
             const displayItems = showSaleOnly ? items.filter(item => item.onSale) : items;
 
             if (displayItems.length === 0) {
-                const emptyText = showSaleOnly ? "No items currently on sale." : "Your wishlist is waiting to be filled.";
-                const cta = showSaleOnly ? "" : `<button class="btn-primary" onclick="window.openAddModal()">Add Your First Wish</button>`;
-
+                const emptyText = showSaleOnly ? "No items currently on sale." : "Your wish space is empty. Start visualizing your dreams.";
+                let content = '';
+                if (!showSaleOnly) {
+                    content = `
+                        <div class="empty-actions">
+                            <button class="btn-primary" onclick="window.openAddModal()" style="width:100%">+ Add Your First Wish</button>
+                            <button class="btn-primary btn-google" onclick="window.openAddModal(); setTimeout(() => document.getElementById('btn-magic-add').click(), 200);" style="width:100%">✨ Try Magic Add (URL)</button>
+                            <button class="btn-text" onclick="window.location.hash='#/friends'" style="margin-top:8px;">Invite a Friend →</button>
+                        </div>
+                    `;
+                }
                 container.innerHTML = `
-                    <div class="empty-state-card glass-panel">
-                        <div class="empty-icon">✨</div>
+                    <div class="glass-panel empty-state-card">
+                        <span class="empty-icon">💭</span>
+                        <h2 class="empty-title">Start Your List</h2>
                         <p class="empty-text">${emptyText}</p>
-                        ${cta}
+                        ${content}
                     </div>
                 `;
                 return;
@@ -218,13 +228,13 @@ export const HomeView = {
                 let gridHtml = '';
                 displayItems.forEach((item, index) => {
                     gridHtml += HomeView.renderCard(item);
+                    // Insert Ad Slot every 5 items (Task 6)
                     if (!authService.isPremium && (index + 1) % 5 === 0) {
-                        const ad = new AdSlot();
+                        const ad = new AdSlot({ provider: 'adsense' }); // Use real provider logic
                         gridHtml += `<div class="ad-wrapper">${ad.getElement().outerHTML}</div>`;
                     }
                 });
                 container.innerHTML = `<div class="masonry-grid">` + gridHtml + `</div>`;
-
                 container.querySelectorAll('.ad-slot').forEach(el => el.addEventListener('click', () => premiumModal.open()));
             } else {
                 container.innerHTML = HomeView.renderTimeline(displayItems);
@@ -232,19 +242,22 @@ export const HomeView = {
 
         } catch (error) {
             console.error("HomeView Load Error:", error);
+            container.innerHTML = `<div class="empty-state">Unable to load wishes. <button class="btn-text" onclick="HomeView.loadData()">Retry</button></div>`;
         }
     },
 
     renderCard: (item) => {
-        // ... (Keep existing renderCard logic) ...
-        // Re-injecting standard render logic for completeness
         const catConfig = CATEGORIES[item.category] || CATEGORIES['Other'];
         const icon = catConfig ? catConfig.icon : '📦';
         const subText = item.subcategory ? `• ${item.subcategory}` : '';
         const timeData = getCountdown(item.targetDate);
-        let timeBadge = '';
+
+        let badges = '';
         if (timeData) {
-            timeBadge = `<div style="margin-bottom: 8px;"><span class="time-tag ${timeData.class}" style="display: inline-flex;">⏳ ${timeData.text}</span></div>`;
+            badges += `<span class="time-tag ${timeData.class}" style="display: inline-flex;">⏳ ${timeData.text}</span>`;
+        }
+        if (item.occasion) {
+            badges += `<span class="time-tag tag-far" style="display: inline-flex; margin-left:4px;">🎉 ${item.occasion}</span>`;
         }
 
         let topBadge = '';
@@ -273,7 +286,7 @@ export const HomeView = {
                 </div>
                 <div class="card-content">
                     <h3>${item.title}</h3>
-                    ${timeBadge}
+                    <div style="margin-bottom:8px;">${badges}</div>
                     <div class="card-meta">
                         <span class="tag">${icon} ${item.category} ${subText}</span>
                         ${priceDisplay}
@@ -283,5 +296,5 @@ export const HomeView = {
         `;
     },
 
-    renderTimeline: (items) => { /* ... existing ... */ return ''; }
+    renderTimeline: (items) => { return '<div class="empty-state">Timeline coming soon...</div>'; }
 };

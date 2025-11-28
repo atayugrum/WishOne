@@ -1,7 +1,7 @@
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
-import { CATEGORIES } from '../config/categories.js'; // NEW
-import { i18n } from '../services/LocalizationService.js'; // NEW
+import { CATEGORIES } from '../config/categories.js';
+import { i18n } from '../services/LocalizationService.js';
 
 export const ClosetView = {
     render: async () => {
@@ -14,7 +14,13 @@ export const ClosetView = {
             return `
                 <div class="view-header">
                     <h1>${i18n.t('closet.title')}</h1>
-                    <p class="empty-state">${i18n.t('closet.empty')}</p>
+                    <p>${i18n.t('closet.subtitle')}</p>
+                </div>
+                <div class="glass-panel empty-state-card">
+                    <span class="empty-icon">🧥</span>
+                    <h3 class="empty-title">Your Closet is Empty</h3>
+                    <p class="empty-text">When you fulfill a wish, move it here to track your manifestations.</p>
+                    <button class="btn-primary" onclick="window.location.hash='#/'">Go to Wishlist</button>
                 </div>
             `;
         }
@@ -23,7 +29,7 @@ export const ClosetView = {
             // Rich Data Logic
             const catConfig = CATEGORIES[item.category] || CATEGORIES['Other'];
             const icon = catConfig ? catConfig.icon : '📦';
-            
+
             return `
                 <article class="glass-panel card card-owned">
                     <div class="card-img-container">

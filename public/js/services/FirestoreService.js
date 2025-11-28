@@ -11,7 +11,9 @@ import {
     getDoc,
     query,
     where,
-    serverTimestamp
+    serverTimestamp,
+    orderBy,
+    limit
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 export class FirestoreService {
@@ -20,7 +22,6 @@ export class FirestoreService {
         this.itemsCollection = collection(db, 'items');
     }
 
-    // Helper: Clean data
     _transformItem(doc) {
         const data = doc.data();
         return {
@@ -29,11 +30,43 @@ export class FirestoreService {
             price: data.price,
             currency: data.currency || 'TRY',
             category: data.category,
+            subcategory: data.subcategory || null,
             priority: data.priority || 'Medium',
+            occasion: data.occasion || null,
             imageUrl: data.imageUrl || 'https://placehold.co/600x400/png',
             claimedBy: data.claimedBy || null,
+            originalUrl: data.originalUrl || null,
+            onSale: data.onSale || false,
             ...data
         };
+    }
+
+    // --- ACTIVITY LOG (Task 3.3) ---
+    async addActivity(userId, type, details) {
+        try {
+            await addDoc(collection(db, 'users', userId, 'activities'), {
+                type, // 'add_wish', 'manifest', 'friend_add'
+                details, // e.g., item title, friend name
+                createdAt: serverTimestamp()
+            });
+        } catch (e) {
+            console.warn("Failed to log activity:", e);
+        }
+    }
+
+    async getRecentActivities(userId) {
+        try {
+            const q = query(
+                collection(db, 'users', userId, 'activities'),
+                orderBy('createdAt', 'desc'),
+                limit(10)
+            );
+            const snap = await getDocs(q);
+            return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        } catch (e) {
+            console.warn("Failed to fetch activities:", e);
+            return [];
+        }
     }
 
     // 1. Get Wishlist
@@ -63,6 +96,8 @@ export class FirestoreService {
                 isOwned: false,
                 claimedBy: null
             });
+            // Log Activity
+            this.addActivity(itemData.ownerId, 'add_wish', { title: itemData.title });
             return docRef.id;
         } catch (e) {
             console.error("Error adding document: ", e);
@@ -70,7 +105,7 @@ export class FirestoreService {
         }
     }
 
-    // 2.5 Update Item (NEW)
+    // 2.5 Update Item
     async updateItem(itemId, updateData) {
         try {
             const itemRef = doc(db, 'items', itemId);
@@ -81,6 +116,22 @@ export class FirestoreService {
         } catch (error) {
             console.error("Error updating item:", error);
             throw error;
+        }
+    }
+
+    async checkItemExists(userId, url) {
+        if (!url) return false;
+        try {
+            const q = query(
+                this.itemsCollection,
+                where("ownerId", "==", userId),
+                where("originalUrl", "==", url),
+                where("isOwned", "==", false)
+            );
+            const snap = await getDocs(q);
+            return !snap.empty;
+        } catch (error) {
+            return false;
         }
     }
 
@@ -95,27 +146,20 @@ export class FirestoreService {
         }
     }
 
-    // 4. FRIEND MANAGEMENT (Replaces Partner)
+    // 4. FRIEND MANAGEMENT
     async addFriend(myUid, friendEmail) {
-        // 1. Find friend by email
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("email", "==", friendEmail));
         const querySnapshot = await getDocs(q);
 
-        if (querySnapshot.empty) {
-            throw new Error("User not found. Ask them to join WishOne!");
-        }
+        if (querySnapshot.empty) throw new Error("User not found.");
 
         const friendDoc = querySnapshot.docs[0];
         const friendId = friendDoc.id;
         const friendData = friendDoc.data();
 
-        if (friendId === myUid) {
-            throw new Error("You cannot add yourself as a friend!");
-        }
+        if (friendId === myUid) throw new Error("Cannot add yourself.");
 
-        // 2. Add to MY friends collection (subcollection)
-        // users/{myUid}/friends/{friendId}
         const myFriendRef = doc(db, "users", myUid, "friends", friendId);
         await setDoc(myFriendRef, {
             uid: friendId,
@@ -125,7 +169,6 @@ export class FirestoreService {
             addedAt: serverTimestamp()
         });
 
-        // 3. Add ME to THEIR friends collection (reciprocal for now)
         const myProfile = await this.getUserProfile(myUid);
         const theirFriendRef = doc(db, "users", friendId, "friends", myUid);
         await setDoc(theirFriendRef, {
@@ -135,6 +178,9 @@ export class FirestoreService {
             avatarUrl: myProfile.avatarUrl || null,
             addedAt: serverTimestamp()
         });
+
+        // Log Activity
+        this.addActivity(myUid, 'friend_add', { name: friendData.displayName });
 
         return friendData;
     }
@@ -157,30 +203,19 @@ export class FirestoreService {
         await updateDoc(userRef, data);
     }
 
-    async checkUsernameUnique(username) {
-        const usersRef = collection(db, "users");
-        const q = query(usersRef, where("username", "==", username));
-        const snap = await getDocs(q);
-        return snap.empty; // True if unique (no docs found)
-    }
-
     // 6. CLAIM / UNCLAIM ITEM
     async toggleClaimItem(itemId, userId, currentClaimedBy) {
         const itemRef = doc(db, 'items', itemId);
-
-        // If I already claimed it -> Unclaim it (set to null)
         if (currentClaimedBy === userId) {
             await updateDoc(itemRef, { claimedBy: null });
             return "unclaimed";
         }
-        // If nobody claimed it -> Claim it
         else if (!currentClaimedBy) {
             await updateDoc(itemRef, { claimedBy: userId });
             return "claimed";
         }
-        // If someone else claimed it -> Error
         else {
-            throw new Error("This item is already reserved by someone else!");
+            throw new Error("Already reserved!");
         }
     }
 
@@ -194,6 +229,7 @@ export class FirestoreService {
             pinCount: 0
         };
         await addDoc(collection(db, 'boards'), boardData);
+        this.addActivity(userId, 'create_board', { title });
     }
 
     async getBoards(userId) {
@@ -202,9 +238,8 @@ export class FirestoreService {
         return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    // 8. PIN MANAGEMENT (Images inside boards)
+    // 8. PIN MANAGEMENT
     async addPin(boardId, imageUrl) {
-        // Add image to sub-collection 'pins'
         await addDoc(collection(db, 'boards', boardId, 'pins'), {
             imageUrl: imageUrl,
             createdAt: serverTimestamp()
@@ -219,15 +254,21 @@ export class FirestoreService {
 
     async markAsOwned(itemId) {
         const itemRef = doc(db, 'items', itemId);
+
+        // Fetch item title for log before update (optional, but cleaner)
+        const snap = await getDoc(itemRef);
+        const title = snap.exists() ? snap.data().title : 'Item';
+
         await updateDoc(itemRef, {
             isOwned: true,
-            purchasedAt: serverTimestamp() // Optional: remember when you got it
+            purchasedAt: serverTimestamp()
         });
+
+        // Log Activity
+        this.addActivity(snap.data().ownerId, 'manifest', { title });
     }
 
-    // 9. GET CLOSET ITEMS (Only owned stuff)
     async getCloset(userId) {
-        // Query: Owner is me AND isOwned is true
         const q = query(
             this.itemsCollection,
             where("ownerId", "==", userId),
@@ -245,6 +286,7 @@ export class FirestoreService {
                 ...comboData,
                 createdAt: serverTimestamp()
             });
+            this.addActivity(userId, 'create_combo', { title: comboData.title });
             return docRef.id;
         } catch (error) {
             console.error("Error saving combo:", error);

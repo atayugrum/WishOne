@@ -12,10 +12,20 @@ export class Router {
 
     async handleLocation() {
         // 1. Get current hash (default to home)
-        const hash = window.location.hash.slice(1) || '/';
+        // Support query params: #/share?uid=xyz -> path: /share, params: {uid: xyz}
+        const fullHash = window.location.hash.slice(1) || '/';
+        const [path, queryString] = fullHash.split('?');
+
+        // Parse Query Params
+        const params = {};
+        if (queryString) {
+            new URLSearchParams(queryString).forEach((value, key) => {
+                params[key] = value;
+            });
+        }
 
         // 2. Find matching route
-        const route = this.routes[hash] || this.routes['404'];
+        const route = this.routes[path] || this.routes['404'];
 
         // 3. Fluid Transition: Fade Out
         this.appContainer.classList.add('view-exit');
@@ -23,19 +33,20 @@ export class Router {
         // Wait for CSS transition (matches --duration-std)
         setTimeout(async () => {
             // 4. Render New View
+            // Pass params to the render function
             const viewContent = typeof route.render === 'function'
-                ? await route.render()
+                ? await route.render(params)
                 : route.template;
 
             this.appContainer.innerHTML = viewContent;
 
             // 4.5. Call afterRender hook
             if (route.afterRender && typeof route.afterRender === 'function') {
-                await route.afterRender();
+                await route.afterRender(params);
             }
 
             // 5. Update Active State
-            document.dispatchEvent(new CustomEvent('route-changed', { detail: { route: hash } }));
+            document.dispatchEvent(new CustomEvent('route-changed', { detail: { route: path } }));
 
             // 6. Fluid Transition: Fade In
             window.scrollTo(0, 0);
@@ -45,8 +56,8 @@ export class Router {
             // Cleanup animation class
             setTimeout(() => {
                 this.appContainer.classList.remove('view-enter');
-            }, 300); // Slightly longer than 250ms to ensure completion
+            }, 300);
 
-        }, 200); // 200ms exit
+        }, 200);
     }
 }

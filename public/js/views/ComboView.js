@@ -12,27 +12,39 @@ export const ComboView = {
         const closetItems = await firestoreService.getCloset(user.uid);
         const savedCombos = await firestoreService.getCombos(user.uid);
 
+        // Sidebar Empty State
+        const closetGridHtml = closetItems.length > 0
+            ? `<div class="closet-grid-mini">
+                ${closetItems.map(item => `
+                    <div class="closet-item-mini" draggable="true" data-id="${item.id}" data-img="${item.imageUrl || 'https://placehold.co/100x100'}">
+                        <img src="${item.imageUrl || 'https://placehold.co/100x100'}" alt="${item.title}">
+                    </div>
+                `).join('')}
+               </div>`
+            : `<div style="padding:16px; text-align:center; color:var(--text-secondary); font-size:0.9rem; border:1px dashed rgba(0,0,0,0.1); border-radius:12px;">
+                 Your closet is empty.<br>Move items to Closet to style them.
+               </div>`;
+
         return `
             <div class="view-container">
                 <div class="view-header">
                     <h1>Combo Builder</h1>
                     <div class="header-actions">
-                        <button id="btn-ai-suggest" class="btn-magic">✨ AI Stylist</button>
+                        <button id="btn-ai-suggest" class="btn-magic" ${closetItems.length === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>✨ AI Stylist</button>
                         <button id="btn-save-combo" class="btn-primary">Save Combo</button>
                     </div>
                 </div>
                 <div class="combo-layout">
-                    <div class="combo-canvas" id="combo-canvas"><div class="canvas-placeholder">Drag items here</div></div>
+                    <div class="combo-canvas" id="combo-canvas">
+                        <div class="canvas-placeholder">
+                            <span style="font-size:2rem;">👕</span><br>
+                            Drag items here to build a look
+                        </div>
+                    </div>
                     <div class="combo-sidebar">
                         <div class="sidebar-section">
                             <h3>Your Closet</h3>
-                            <div class="closet-grid-mini">
-                                ${closetItems.map(item => `
-                                    <div class="closet-item-mini" draggable="true" data-id="${item.id}" data-img="${item.imageUrl || 'https://placehold.co/100x100'}">
-                                        <img src="${item.imageUrl || 'https://placehold.co/100x100'}" alt="${item.title}">
-                                    </div>
-                                `).join('')}
-                            </div>
+                            ${closetGridHtml}
                         </div>
                         <div class="sidebar-section" style="margin-top: 32px;">
                             <h3>Saved Combos</h3>
@@ -92,11 +104,16 @@ export const ComboView = {
             if (!title) return;
             const items = Array.from(canvas.querySelectorAll('.canvas-item')).map(img => ({ itemId: img.dataset.id, src: img.src, left: img.style.left, top: img.style.top, width: img.style.width }));
             if (items.length === 0) return alert("Canvas is empty!");
-            saveBtn.textContent = "Saving..."; saveBtn.disabled = true;
+
             try {
+                saveBtn.textContent = "Saving..."; saveBtn.disabled = true;
                 await firestoreService.saveCombo(authService.currentUser.uid, { title, items });
-                alert("Combo saved!"); window.location.reload();
-            } catch (error) { alert("Failed to save."); saveBtn.textContent = "Save Combo"; saveBtn.disabled = false; }
+                window.showToast("Combo saved!", "✨");
+                setTimeout(() => window.location.reload(), 1000);
+            } catch (error) {
+                alert("Failed to save.");
+                saveBtn.textContent = "Save Combo"; saveBtn.disabled = false;
+            }
         });
 
         const closeAiModal = () => { aiModal.classList.remove('active'); setTimeout(() => aiModal.style.display = 'none', 300); };
@@ -126,7 +143,7 @@ export const ComboView = {
                             const item = closetItems.find(i => i.id === id);
                             return item ? `<img src="${item.imageUrl}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">` : '';
                         }).join('');
-                        return `<div class="ai-insight suggestion-card" data-index="${index}" style="cursor:pointer;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><strong>${combo.name}</strong><div style="display:flex; gap:4px;">${thumbnails}</div></div><p style="font-size:0.9rem; color:var(--text-secondary); margin:0;">${combo.description}</p></div>`;
+                        return `<div class="ai-insight suggestion-card glass-panel" data-index="${index}" style="cursor:pointer; margin-bottom:12px;"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;"><strong>${combo.name}</strong><div style="display:flex; gap:4px;">${thumbnails}</div></div><p style="font-size:0.9rem; color:var(--text-secondary); margin:0;">${combo.description}</p></div>`;
                     }).join('');
 
                     const cards = aiResults.querySelectorAll('.suggestion-card');
@@ -148,13 +165,22 @@ export const ComboView = {
                     aiResults.innerHTML = `<p>${data.message || "No combos found."}</p>`;
                 }
             } catch (error) {
-                alert(`AI Failed: ${error.message}`);
+                // Graceful Error State
+                aiResults.innerHTML = `
+                    <div style="text-align:center; padding:20px; color:#ff3b30;">
+                        <p>AI is taking a coffee break.</p>
+                        <small>${error.message}</small>
+                        <button class="btn-text" onclick="document.getElementById('close-ai-modal').click()">Close</button>
+                    </div>
+                `;
             }
         });
 
         window.loadCombo = (combo) => {
             if (!confirm(`Load combo "${combo.title}"?`)) return;
             canvas.innerHTML = '';
+            const placeholder = canvas.querySelector('.canvas-placeholder');
+            if (placeholder) placeholder.remove();
             combo.items.forEach(item => {
                 this.addItemToCanvas(item.itemId, item.src, parseFloat(item.left), parseFloat(item.top), item.width);
             });

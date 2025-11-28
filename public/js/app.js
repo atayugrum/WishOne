@@ -4,11 +4,13 @@ import { HomeView } from './views/HomeView.js';
 import { WelcomeView } from './views/WelcomeView.js';
 import { FriendsView } from './views/FriendsView.js';
 import { FriendWishlistView } from './views/FriendWishlistView.js';
+import { PublicWishlistView } from './views/PublicWishlistView.js'; // NEW
 import { InspoView } from './views/InspoView.js';
 import { ClosetView } from './views/ClosetView.js';
 import { ComboView } from './views/ComboView.js';
-import { ProfileView } from './views/ProfileView.js'; // Import New View
+import { ProfileView } from './views/ProfileView.js';
 import { authService } from './services/AuthService.js';
+import { LogService } from './services/LogService.js'; // NEW
 
 // Import AI modules
 import { AICompanion } from './components/AICompanion.js';
@@ -19,14 +21,17 @@ const routes = {
     '/welcome': WelcomeView,
     '/friends': FriendsView,
     '/friend-wishlist': FriendWishlistView,
+    '/share': PublicWishlistView, // NEW: Public Route
     '/inspo': InspoView,
     '/closet': ClosetView,
     '/combos': ComboView,
-    '/profile': ProfileView, // Add Route
+    '/profile': ProfileView,
     '404': { template: '<h1>404 - Not Found</h1>' }
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    LogService.info('App Started');
+
     // 1. Initialize Header
     const header = new Header();
     header.mount('body');
@@ -35,7 +40,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         window.aiCompanion = new AICompanion();
     } catch (e) {
-        // Silent fail
+        LogService.error('AI Companion Init Failed', { error: e.message });
     }
 
     // 3. Initialize Router
@@ -61,8 +66,24 @@ document.addEventListener('DOMContentLoaded', () => {
             router.handleLocation();
         } else {
             header.hide();
-            window.location.hash = '#/welcome';
+            // Allow public share route even if logged out
+            if (!window.location.hash.startsWith('#/share')) {
+                window.location.hash = '#/welcome';
+            }
             router.handleLocation();
         }
+    });
+
+    // 5. Offline/Online Handling
+    window.addEventListener('offline', () => {
+        window.showToast("You are offline. Changes may not save.", "📡");
+        document.body.style.filter = "grayscale(0.8)";
+        LogService.warn('Network Status', { status: 'offline' });
+    });
+
+    window.addEventListener('online', () => {
+        window.showToast("Back online!", "🟢");
+        document.body.style.filter = "";
+        LogService.info('Network Status', { status: 'online' });
     });
 });

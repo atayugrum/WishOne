@@ -17,8 +17,9 @@ export class Header {
         const currentLang = i18n.lang.toUpperCase();
 
         this.element.innerHTML = `
-            <div class="logo">
-                <span class="logo-text">WishOne</span>
+            <div class="logo" style="display:flex; align-items:center; gap:12px;">
+                <img src="img/icon.jpg" alt="WishOne" class="brand-logo-small">
+                <span class="logo-text" style="font-weight:700; font-size:1.2rem; letter-spacing:-0.5px;">WishOne</span>
             </div>
 
             <nav class="nav-pills">

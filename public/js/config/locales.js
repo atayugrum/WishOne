@@ -39,17 +39,26 @@ export const TRANSLATIONS = {
             cancel: "Cancel",
             save: "Save"
         },
-        timeline: {
-            someday: "Someday"
-        },
-        savings: {
-            weekly: "Save {amount} / week"
+        // --- NEW v2 STRINGS ---
+        profile: {
+            title: "My Profile",
+            privacy_label: "Wishlist Visibility",
+            privacy_desc: "Allow others to see your list via link?",
+            only_me: "Only Me",
+            public: "Public",
+            friends_only: "Friends"
         },
         ai: {
             title: "AI Assistant",
             subtitle: "Let AI help you find your next wish.",
             inputPlaceholder: "What are you looking for?",
-            generate: "Generate Ideas"
+            generate: "Generate Ideas",
+            compatibility: "Compatibility",
+            vibe_check: "Vibe Check"
+        },
+        gamification: {
+            milestone_5: "5 Wishes Added! 🌟",
+            manifested: "Manifested! ✨"
         }
     },
     tr: {
@@ -92,17 +101,26 @@ export const TRANSLATIONS = {
             cancel: "İptal",
             save: "Kaydet"
         },
-        timeline: {
-            someday: "Bir Gün"
-        },
-        savings: {
-            weekly: "Haftalık {amount} biriktir"
+        // --- NEW v2 STRINGS ---
+        profile: {
+            title: "Profilim",
+            privacy_label: "Liste Gizliliği",
+            privacy_desc: "Listen başkaları tarafından görülebilir mi?",
+            only_me: "Sadece Ben",
+            public: "Herkes",
+            friends_only: "Arkadaşlar"
         },
         ai: {
-            title: "Yapay Zeka Asistanı",
+            title: "Yapay Zeka",
             subtitle: "Yapay zeka bir sonraki isteğini bulmana yardımcı olsun.",
             inputPlaceholder: "Ne arıyorsun?",
-            generate: "Fikir Üret"
+            generate: "Fikir Üret",
+            compatibility: "Uyumluluk",
+            vibe_check: "Mod Analizi"
+        },
+        gamification: {
+            milestone_5: "5 İstek Eklendi! 🌟",
+            manifested: "Gerçekleşti! ✨"
         }
     }
 };

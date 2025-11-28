@@ -21,6 +21,7 @@ server/*.env
 # Firebase / service account
 serviceAccount*.json
 firebase-debug.log
+serviceAccountKey.json
 
 # Editor / OS
 .vscode/
