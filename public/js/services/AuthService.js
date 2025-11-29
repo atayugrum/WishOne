@@ -5,9 +5,10 @@ import {
     onAuthStateChanged,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
-    updateProfile
+    updateProfile,
+    deleteUser
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-import { doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { doc, setDoc, getDoc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { FEATURE_LIMITS } from '../config/limits.js';
 
 export class AuthService {
@@ -57,7 +58,26 @@ export class AuthService {
         await signOut(auth);
         this.currentUser = null;
         this.userProfile = null;
-        localStorage.clear(); // Clear usage logs on logout
+        localStorage.clear();
+    }
+
+    // Task 1: Delete Account Logic
+    async deleteUserAccount() {
+        if (!this.currentUser) return;
+
+        try {
+            // Firestore cleanup handled by FirestoreService separately or here
+            // Ideally, delete items first, then user doc, then Auth
+            // For simplicity in V3, we rely on a service method call before this.
+
+            await deleteUser(this.currentUser);
+            this.currentUser = null;
+            this.userProfile = null;
+            localStorage.clear();
+        } catch (error) {
+            console.error("Delete Account failed:", error);
+            throw error; // Likely requires re-auth
+        }
     }
 
     init(callback) {
@@ -85,6 +105,7 @@ export class AuthService {
                         lastName: displayName.split(' ').slice(1).join(' '),
                         plan: 'free',
                         friends: [],
+                        isPrivate: false, // Default visibility
                         phoneNumber: null,
                         dateOfBirth: null,
                         createdAt: new Date()
@@ -107,7 +128,6 @@ export class AuthService {
     async upgradeToPremium() {
         if (!this.currentUser) return;
         const userRef = doc(db, "users", this.currentUser.uid);
-        // Mock Payment Success
         await updateDoc(userRef, {
             plan: 'premium',
             planSince: new Date()
@@ -117,8 +137,6 @@ export class AuthService {
         }
     }
 
-    // --- USAGE LIMITS ---
-
     _getUsageKey(feature) {
         const today = new Date().toISOString().split('T')[0];
         return `limit_${feature}_${this.currentUser?.uid}_${today}`;
@@ -126,29 +144,17 @@ export class AuthService {
 
     canUseFeature(feature) {
         if (this.isPremium) return true;
-
         const key = this._getUsageKey(feature);
         const count = parseInt(localStorage.getItem(key) || '0');
         const limit = FEATURE_LIMITS[feature.toUpperCase()] || 0;
-
         return count < limit;
     }
 
     trackFeatureUsage(feature) {
         if (this.isPremium) return;
-
         const key = this._getUsageKey(feature);
         const count = parseInt(localStorage.getItem(key) || '0');
         localStorage.setItem(key, count + 1);
-        console.log(`tracked usage for ${feature}: ${count + 1}`);
-    }
-
-    getRemainingUsage(feature) {
-        if (this.isPremium) return Infinity;
-        const key = this._getUsageKey(feature);
-        const count = parseInt(localStorage.getItem(key) || '0');
-        const limit = FEATURE_LIMITS[feature.toUpperCase()] || 0;
-        return Math.max(0, limit - count);
     }
 }
 

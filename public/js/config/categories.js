@@ -47,5 +47,12 @@ export const CATEGORIES = {
         icon: '📦',
         color: '#8E8E93',
         subcategories: ['Books', 'Stationery', 'Gifts', 'Misc']
+    },
+    'Custom': {
+        id: 'custom',
+        label: 'Custom',
+        icon: '✨',
+        color: '#FFD700',
+        subcategories: []
     }
 };

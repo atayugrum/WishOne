@@ -1,8 +1,9 @@
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
 import { i18n } from '../services/LocalizationService.js';
-import { apiCall } from '../config/api.js'; // Import API
+import { apiCall } from '../config/api.js';
 import { premiumModal } from '../components/PremiumModal.js';
+import { aiService } from '../services/AIService.js'; // Import AI
 
 export const FriendsView = {
     render: async () => {
@@ -12,9 +13,7 @@ export const FriendsView = {
         let friends = [];
         try {
             friends = await firestoreService.getFriends(user.uid);
-        } catch (e) {
-            console.error("Error fetching friends:", e);
-        }
+        } catch (e) { console.error(e); }
 
         window.handleAddFriend = async () => {
             const emailInput = document.getElementById('friend-email');
@@ -24,17 +23,23 @@ export const FriendsView = {
             if (!email) return;
 
             try {
-                btn.innerHTML = `<span class="spinner-small"></span> Adding...`;
+                btn.innerHTML = `<span class="spinner-small"></span>`;
                 btn.disabled = true;
+
+                // Mascot Thinking
+                if (window.aiCompanion) window.aiCompanion.setState('thinking');
 
                 await firestoreService.addFriend(user.uid, email);
 
+                // AI Reaction: Celebrating friendship
+                aiService.triggerReaction('friend_add', { name: 'New Friend' });
+
                 window.showToast("Friend added!", "👋");
-                const newContent = await FriendsView.render();
-                document.getElementById('app').innerHTML = newContent;
+                document.getElementById('app').innerHTML = await FriendsView.render();
             } catch (error) {
                 alert(error.message);
-                btn.textContent = "Add Friend";
+                if (window.aiCompanion) window.aiCompanion.say("I couldn't find them.", "error");
+                btn.textContent = i18n.t('friends.add');
                 btn.disabled = false;
             }
         };
@@ -44,24 +49,19 @@ export const FriendsView = {
             window.location.hash = '#/friend-wishlist';
         };
 
-        // Task 4.2: AI Compatibility
         window.handleCheckCompatibility = async (e, friendId, friendName) => {
-            e.stopPropagation(); // Don't navigate to list
-
-            if (!authService.isPremium) {
-                premiumModal.open();
-                return;
-            }
+            e.stopPropagation();
+            if (!authService.isPremium) { premiumModal.open(); return; }
 
             const card = e.target.closest('.friend-card');
-            const originalContent = card.innerHTML;
-
-            // Inline Loading
             const resultDiv = document.createElement('div');
             resultDiv.className = 'glass-panel';
             resultDiv.style.marginTop = '12px';
-            resultDiv.innerHTML = `<div class="loading-spinner">Analyzing wishlist vibes...</div>`;
+            resultDiv.innerHTML = `<div class="loading-spinner">${i18n.t('friends.analyzing')}</div>`;
             card.after(resultDiv);
+
+            // Mascot: Magic/Divination pose
+            if (window.aiCompanion) window.aiCompanion.say("Reading the stars...", "magic");
 
             try {
                 const [myItems, friendItems] = await Promise.all([
@@ -75,9 +75,11 @@ export const FriendsView = {
                     names: { user: 'You', friend: friendName }
                 });
 
+                if (window.aiCompanion) window.aiCompanion.say("The results are in!", "presenting");
+
                 resultDiv.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <strong>Compatibility: ${data.score}%</strong>
+                        <strong>${i18n.t('friends.compat_score')}: ${data.score}%</strong>
                         <button class="btn-text" onclick="this.parentElement.parentElement.remove()">&times;</button>
                     </div>
                     <p style="font-size:0.9rem; margin-top:8px;">${data.summary}</p>
@@ -85,9 +87,9 @@ export const FriendsView = {
                         ${data.sharedInterests.map(t => `<span class="tag" style="font-size:0.7rem;">${t}</span>`).join('')}
                     </div>
                 `;
-
             } catch (error) {
-                resultDiv.innerHTML = `<p style="color:red; font-size:0.8rem;">AI analysis failed.</p>`;
+                resultDiv.innerHTML = `<p style="color:red; font-size:0.8rem;">${i18n.t('ai.error')}</p>`;
+                if (window.aiCompanion) window.aiCompanion.say("I got confused.", "error");
                 setTimeout(() => resultDiv.remove(), 2000);
             }
         };
@@ -100,33 +102,29 @@ export const FriendsView = {
                         <h3 style="margin:0; font-size:1rem;">${friend.displayName}</h3>
                         <p style="margin:0; font-size:0.8rem; color:var(--text-secondary);">${friend.email}</p>
                     </div>
-                    <button class="btn-text" onclick="window.handleCheckCompatibility(event, '${friend.uid}', '${friend.displayName}')" style="font-size:1.2rem;" title="Check Compatibility">🔮</button>
+                    <button class="btn-text" onclick="window.handleCheckCompatibility(event, '${friend.uid}', '${friend.displayName}')" style="font-size:1.2rem;" title="${i18n.t('friends.compatibility')}">🔮</button>
                     <div style="font-size:1.2rem; color:var(--text-tertiary);">➔</div>
                 </div>
             `).join('')
             : `
             <div class="glass-panel empty-state-card" style="margin-top:0;">
                 <span class="empty-icon">👋</span>
-                <h3 class="empty-title">No Friends Yet</h3>
-                <p class="empty-text">Add your friends to see their wishes and gift them secretly.</p>
+                <h3 class="empty-title">${i18n.t('friends.empty')}</h3>
             </div>
             `;
 
         return `
             <div class="view-header">
-                <h1>${i18n.t('nav.friends') || 'Friends'}</h1>
-                <p>Connect with others to see their wishes.</p>
+                <h1>${i18n.t('friends.title')}</h1>
+                <p>${i18n.t('friends.subtitle')}</p>
             </div>
 
             <div style="max-width: 600px; margin: 0 auto;">
                 <div class="glass-panel" style="padding: 24px; margin-bottom: 32px; display:flex; gap:12px; align-items:center;">
-                    <input type="email" id="friend-email" placeholder="Friend's Email" style="flex:1; margin:0;">
-                    <button id="btn-add-friend" class="btn-primary" onclick="window.handleAddFriend()">Add Friend</button>
+                    <input type="email" id="friend-email" placeholder="${i18n.t('friends.add_placeholder')}" style="flex:1; margin:0;">
+                    <button id="btn-add-friend" class="btn-primary" onclick="window.handleAddFriend()">${i18n.t('friends.add')}</button>
                 </div>
-
-                <div class="friends-list">
-                    ${friendsListHtml}
-                </div>
+                <div class="friends-list">${friendsListHtml}</div>
             </div>
         `;
     }

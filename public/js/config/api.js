@@ -1,17 +1,14 @@
 // js/config/api.js
 
-// Dynamic Environment Detection
 const getBaseUrl = () => {
     const host = window.location.hostname;
 
     // 1. Local Development
     if (host === 'localhost' || host === '127.0.0.1') {
-        return 'http://localhost:3001';
+        return 'http://localhost:3001'; // <--- CONFIRMED 3001
     }
 
-    // 2. Production (Firebase Hosting rewrites /api to Cloud Functions or Container)
-    // If you deploy server.js to Cloud Run/Functions, you might use a specific URL.
-    // For now, we assume the backend is served relative or proxied.
+    // 2. Production (Relative path for same-domain hosting)
     return '';
 };
 
@@ -37,10 +34,8 @@ export async function apiCall(endpoint, method = 'GET', body = null) {
         return await response.json();
     } catch (error) {
         console.error("API Call Failed:", error);
-
-        // Context-aware errors
         if (error.message.includes('Failed to fetch')) {
-            console.warn("Backend unreachable. Is the server running?");
+            console.warn("Backend unreachable. Ensure server is running on port 3001.");
             throw new Error("Service unavailable. Please try again later.");
         }
         throw error;

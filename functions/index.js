@@ -1,3 +1,4 @@
+const functions = require('firebase-functions');
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -6,10 +7,9 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const admin = require('firebase-admin');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: true }));
 app.use(express.json());
 
 // --- LOGGING UTILITY ---
@@ -34,24 +34,27 @@ app.use((req, res, next) => {
     next();
 });
 
+// --- CONFIGURATION ---
+// FIX: Use process.env directly. Cloud Functions loads variables into process.env automatically.
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const SCHEDULER_SECRET = process.env.SCHEDULER_SECRET;
+
 // Initialize Gemini AI
-const genAI = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
 
 // Initialize Firebase Admin
 let db = null;
 try {
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS || process.env.FIREBASE_CONFIG) {
-        admin.initializeApp({
-            credential: admin.credential.applicationDefault()
-        });
-        db = admin.firestore();
-        Logger.info("FIREBASE_INIT_SUCCESS");
+    if (!admin.apps.length) {
+        admin.initializeApp();
     }
+    db = admin.firestore();
+    Logger.info("FIREBASE_INIT_SUCCESS");
 } catch (e) {
     Logger.error("FIREBASE_INIT_FAIL", e);
 }
 
-// --- CONFIG ---
+// --- CONSTANTS ---
 const CATEGORY_MAP = {
     "Tech": ["Audio", "Gaming", "Apple", "Smart Home", "Accessories"],
     "Fashion": ["Tops", "Bottoms", "Shoes", "Bags", "Jewelry", "Outerwear"],
@@ -68,23 +71,23 @@ const ALLOWED_MOODS = [
 ];
 
 // --- HELPERS ---
-
 function cleanAndParseJSON(text) {
-    if (!text) throw new Error("Empty response from AI");
-    let clean = text.replace(/```json|```/g, '').trim();
-    clean = clean.replace(/\/\/.*$/gm, ''); // Remove comments
-    const firstOpen = clean.indexOf('{');
-    const lastClose = clean.lastIndexOf('}');
-    if (firstOpen !== -1 && lastClose !== -1) {
-        clean = clean.substring(firstOpen, lastClose + 1);
-    } else {
-        throw new Error("No JSON object found");
-    }
     try {
-        return JSON.parse(clean);
+        return JSON.parse(text);
     } catch (e) {
-        Logger.error("JSON_PARSE_FAIL_RAW", { raw: clean });
-        throw new Error("Failed to parse JSON");
+        let clean = text.replace(/```json|```/g, '').trim();
+        clean = clean.replace(/\/\/.*$/gm, '');
+        const firstOpen = clean.indexOf('{');
+        const lastClose = clean.lastIndexOf('}');
+        if (firstOpen !== -1 && lastClose !== -1) {
+            clean = clean.substring(firstOpen, lastClose + 1);
+            try {
+                return JSON.parse(clean);
+            } catch (e2) {
+                throw new Error("Failed to parse JSON snippet");
+            }
+        }
+        throw new Error("No JSON found");
     }
 }
 
@@ -151,20 +154,7 @@ app.post('/api/product/metadata', async (req, res) => {
         if (genAI && (data.title || data.description)) {
             try {
                 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-                const prompt = `
-                    Act as a smart shopping assistant.
-                    Analyze this product: ${data.title} ${data.description.substring(0, 200)} ${data.price}.
-                    Known Categories: ${JSON.stringify(CATEGORY_MAP)}.
-                    
-                    Task:
-                    1. Categorize it.
-                    2. Clean up the title (remove spammy keywords).
-                    3. Suggest a priority level.
-                    4. Give a friendly, short reason for the priority (e.g. "Great for summer!" or "A bit pricey, maybe wait for sale.").
-                    
-                    Output strict JSON only. No markdown. 
-                    JSON: { "category": "String", "subcategory": "String", "cleanTitle": "String", "priorityLevel": "String", "priorityLabel": "String", "reason": "String", "estimatedPrice": Number }
-                `;
+                const prompt = `Analyze: ${data.title} ${data.description.substring(0, 200)} ${data.price}. Cats: ${JSON.stringify(CATEGORY_MAP)}. Output strict JSON only. No markdown. No comments. JSON: { "category": "String", "subcategory": "String", "cleanTitle": "String", "priorityLevel": "String", "priorityLabel": "String", "reason": "String", "estimatedPrice": Number }`;
                 const result = await model.generateContent(prompt);
                 const aiData = cleanAndParseJSON(result.response.text());
 
@@ -193,15 +183,11 @@ app.post('/api/ai/combo-suggestions', async (req, res) => {
         if (!genAI) return res.status(503).json({ error: 'AI unavailable' });
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `
-            Act as a friendly personal stylist who loves fashion and design.
-            Create 1-3 outfits/combos from these items: ${JSON.stringify(closetItems.map(i => ({ id: i.id, name: i.title, cat: i.category })))}.
-            Write a fun, encouraging description for each combo.
-            Output strict JSON only. No markdown. 
-            JSON: { "combos": [{ "name": "String", "description": "String", "itemIds": ["id1"] }] }
-        `;
+        const prompt = `Stylist Task: Create 1-3 outfits from: ${JSON.stringify(closetItems.map(i => ({ id: i.id, name: i.title, cat: i.category })))}. Output strict JSON only. No markdown. JSON: { "combos": [{ "name": "String", "description": "String", "itemIds": ["id1"] }] }`;
         const result = await model.generateContent(prompt);
-        res.json(cleanAndParseJSON(result.response.text()));
+
+        const json = cleanAndParseJSON(result.response.text());
+        res.json(json);
     } catch (e) {
         Logger.error("AI_COMBO_FAIL", e);
         res.status(500).json({ error: e.message });
@@ -216,18 +202,11 @@ app.post('/api/ai/purchase-planner', async (req, res) => {
         if (!genAI) return res.status(503).json({ error: 'AI unavailable' });
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `
-            Act as a supportive, financially savvy friend.
-            Budget: ${budget} ${currency}.
-            Items: ${JSON.stringify(wishlistItems.map(i => ({ id: i.id, name: i.title, price: i.price, priority: i.priority })))}.
-            
-            Task: Pick the best items to buy now.
-            Write a "summary" that feels personal and encouraging, like "You can totally afford these this month!"
-            Output strict JSON only. No markdown. 
-            JSON: { "recommendedItems": [{ "itemId": "String", "reason": "String" }], "summary": "String" }
-        `;
+        const prompt = `Budget: ${budget} ${currency}. Items: ${JSON.stringify(wishlistItems.map(i => ({ id: i.id, name: i.title, price: i.price, priority: i.priority })))}. Pick items. Output strict JSON only. No markdown. No comments. JSON: { "recommendedItems": [{ "itemId": "String", "reason": "String" }], "summary": "String" }`;
         const result = await model.generateContent(prompt);
-        res.json(cleanAndParseJSON(result.response.text()));
+
+        const json = cleanAndParseJSON(result.response.text());
+        res.json(json);
     } catch (e) {
         Logger.error("AI_PLANNER_FAIL", e);
         res.status(500).json({ error: "AI Planner failed to parse response." });
@@ -244,30 +223,14 @@ app.post('/api/ai/reaction', async (req, res) => {
     try {
         const { context, userAction } = req.body;
 
-        if (!genAI) {
-            return res.json({ message: "You've got great taste!", mood: "presenting" });
-        }
+        if (!genAI) return res.json({ message: "That looks amazing!", mood: "presenting" });
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
         const prompt = `
-            You are the AtOne Mascot, a warm, friendly, and enthusiastic AI companion.
-            Your goal is to make the user feel supported and excited about their wishes.
-            
+            You are a Zen, friendly AI mascot for a wishlist app called WishOne.
             User Action: ${userAction}
             Context: ${JSON.stringify(context)}
-            Allowed Moods: ${JSON.stringify(ALLOWED_MOODS)}
-            
-            Task:
-            1. Generate a short reaction message (max 12 words). It should feel like a text from a supportive friend. Use the user's name if available.
-            2. Pick the best mascot mood.
-            
-            Examples:
-            - "add_wish": "Ooh, that's beautiful! Added to your dreams." (mood: magic)
-            - "manifest": "Yay! You manifested it! So proud of you." (mood: celebrating)
-            - "login": "Hi [Name]! Ready to dream big today?" (mood: welcome)
-            - "delete_wish": "Making space for better things. Good call." (mood: zen)
-            
+            Task: Generate a short, warm, encouraging reaction message (max 12 words) and pick a mood from: ${JSON.stringify(ALLOWED_MOODS)}.
             Output strict JSON only. No markdown. JSON: { "message": "String", "mood": "String" }
         `;
         const result = await model.generateContent(prompt);
@@ -285,12 +248,7 @@ app.post('/api/ai/moodboard', async (req, res) => {
         const { title, existingPins } = req.body;
         if (!genAI) return res.status(503).json({ error: 'AI unavailable' });
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `
-            Act as a creative design assistant.
-            Context: Moodboard titled "${title}". Existing Pins: ${existingPins?.length || 0}.
-            Task: Suggest 3-4 specific product types that would match this vibe perfectly.
-            Output strict JSON only. JSON: { "suggestions": [{ "name": "String", "why": "String" }] }
-        `;
+        const prompt = `Context: Moodboard titled "${title}". Existing: ${existingPins?.length || 0}. Task: Suggest 3-4 product TYPES. Output strict JSON only. JSON: { "suggestions": [{ "name": "String", "why": "String" }] }`;
         const result = await model.generateContent(prompt);
         res.json(cleanAndParseJSON(result.response.text()));
     } catch (e) { Logger.error("AI_MOODBOARD_FAIL", e); res.status(500).json({ error: e.message }); }
@@ -303,15 +261,7 @@ app.post('/api/ai/compatibility', async (req, res) => {
         const { userItems, friendItems, names } = req.body;
         if (!genAI) return res.status(503).json({ error: 'AI unavailable' });
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `
-            Act as a fun, matchmaking friend.
-            Analyze compatibility based on wishlists.
-            Person A (${names.user}) items: ${userItems.length}.
-            Person B (${names.friend}) items: ${friendItems.length}.
-            
-            Task: Give a fun score and a cheerful summary of their shared vibe.
-            Output strict JSON only. JSON: { "summary": "String", "score": Number, "sharedInterests": ["Tag1"] }
-        `;
+        const prompt = `Analyze compatibility. A (${names.user}) items count: ${userItems.length}. B (${names.friend}) items count: ${friendItems.length}. Output strict JSON only. JSON: { "summary": "String", "score": Number, "sharedInterests": ["Tag1"] }`;
         const result = await model.generateContent(prompt);
         res.json(cleanAndParseJSON(result.response.text()));
     } catch (e) { Logger.error("AI_COMPATIBILITY_FAIL", e); res.status(500).json({ error: e.message }); }
@@ -323,7 +273,7 @@ app.post('/api/jobs/refresh-prices', async (req, res) => {
 
     // --- SECURITY CHECK ---
     const authHeader = req.headers['x-scheduler-secret'];
-    if (authHeader !== process.env.SCHEDULER_SECRET) {
+    if (authHeader !== SCHEDULER_SECRET) {
         Logger.warn("JOB_UNAUTHORIZED_ATTEMPT");
         return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -363,6 +313,5 @@ app.post('/api/jobs/refresh-prices', async (req, res) => {
     }
 });
 
-const server = app.listen(PORT, () => {
-    Logger.info(`SERVER_START`, { port: PORT });
-});
+// Export as Cloud Function
+exports.api = functions.https.onRequest(app);

@@ -4,13 +4,13 @@ import { HomeView } from './views/HomeView.js';
 import { WelcomeView } from './views/WelcomeView.js';
 import { FriendsView } from './views/FriendsView.js';
 import { FriendWishlistView } from './views/FriendWishlistView.js';
-import { PublicWishlistView } from './views/PublicWishlistView.js'; // NEW
+import { PublicWishlistView } from './views/PublicWishlistView.js';
 import { InspoView } from './views/InspoView.js';
 import { ClosetView } from './views/ClosetView.js';
 import { ComboView } from './views/ComboView.js';
 import { ProfileView } from './views/ProfileView.js';
 import { authService } from './services/AuthService.js';
-import { LogService } from './services/LogService.js'; // NEW
+import { LogService } from './services/LogService.js';
 
 // Import AI modules
 import { AICompanion } from './components/AICompanion.js';
@@ -21,7 +21,7 @@ const routes = {
     '/welcome': WelcomeView,
     '/friends': FriendsView,
     '/friend-wishlist': FriendWishlistView,
-    '/share': PublicWishlistView, // NEW: Public Route
+    '/share': PublicWishlistView,
     '/inspo': InspoView,
     '/closet': ClosetView,
     '/combos': ComboView,
@@ -52,11 +52,13 @@ document.addEventListener('DOMContentLoaded', () => {
             header.updateUser(user);
             header.show();
 
-            // AI Greet (Safely)
+            // AI Greet (Dynamic via Gemini)
             if (window.aiCompanion) {
                 setTimeout(() => {
-                    const msg = aiService.getWelcomeMessage();
-                    window.aiCompanion.say(msg);
+                    // Trigger "login" action so Gemini generates a unique welcome
+                    aiService.triggerReaction('login', {
+                        name: user.displayName || 'Dreamer'
+                    });
                 }, 1000);
             }
 
@@ -78,12 +80,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('offline', () => {
         window.showToast("You are offline. Changes may not save.", "📡");
         document.body.style.filter = "grayscale(0.8)";
+        // Trigger error mood on mascot
+        if (window.aiCompanion) window.aiCompanion.say("I can't reach the cloud...", "error");
         LogService.warn('Network Status', { status: 'offline' });
     });
 
     window.addEventListener('online', () => {
         window.showToast("Back online!", "🟢");
         document.body.style.filter = "";
+        if (window.aiCompanion) window.aiCompanion.say("We are back!", "welcome");
         LogService.info('Network Status', { status: 'online' });
     });
 });

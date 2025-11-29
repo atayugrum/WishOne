@@ -18,7 +18,7 @@ export class Header {
 
         this.element.innerHTML = `
             <div class="logo" style="display:flex; align-items:center; gap:12px;">
-                <img src="img/icon.jpg" alt="WishOne" class="brand-logo-small">
+                <img src="img/icon.png" alt="WishOne" class="brand-logo-small" onerror="this.style.display='none'">
                 <span class="logo-text" style="font-weight:700; font-size:1.2rem; letter-spacing:-0.5px;">WishOne</span>
             </div>
 
@@ -42,17 +42,14 @@ export class Header {
     }
 
     bindEvents() {
-        // 1. Language Toggle
         this.element.querySelector('#toggle-lang').addEventListener('click', () => {
             i18n.toggle();
         });
 
-        // 2. Love Mode
         this.element.querySelector('#toggle-love').addEventListener('click', () => {
             document.body.classList.toggle('mode-love');
         });
 
-        // 3. Navigation Highlighting
         document.addEventListener('route-changed', (e) => {
             const currentPath = e.detail.route;
             const links = this.element.querySelectorAll('.nav-link');
@@ -62,11 +59,9 @@ export class Header {
             });
         });
 
-        // 4. Profile Navigation (UPDATED)
         const authContainer = this.element.querySelector('#auth-container');
         authContainer.addEventListener('click', (e) => {
             if (e.target.closest('.user-avatar')) {
-                // Navigate to Profile Settings instead of logging out
                 window.location.hash = '#/profile';
             }
         });
@@ -75,9 +70,10 @@ export class Header {
     updateUser(user) {
         const container = this.element.querySelector('#auth-container');
         if (user) {
+            const photoURL = authService.userProfile?.photoURL || user.photoURL;
             container.innerHTML = `
                 <div class="user-avatar">
-                    <img src="${user.photoURL}" alt="${user.displayName}">
+                    <img src="${photoURL}" alt="${user.displayName}">
                 </div>
             `;
         } else {

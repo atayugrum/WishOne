@@ -23,23 +23,42 @@
     color: white;
     font-family: var(--font-body);
     font-weight: 600;
-    padding: 12px 24px;
+    padding: 14px 28px;
+    /* Slightly larger click area */
     border-radius: 100px;
-    /* Pill shape */
     border: none;
     cursor: pointer;
-    transition: transform 0.1s var(--ease-ios), opacity 0.2s;
+    transition: all 0.3s var(--ease-ios);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
 }
 
 .btn-primary:active {
-    transform: scale(0.96);
-    /* Tactile click feel */
+    transform: scale(0.98);
 }
 
 .btn-primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
+}
+
+.btn-danger {
+    background: #ff3b30;
+    color: white;
+    font-family: var(--font-body);
+    font-weight: 600;
+    padding: 12px 24px;
+    border-radius: 100px;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.1s var(--ease-ios);
 }
 
 /* --- 3. Floating Header (FIXED) --- */
@@ -49,9 +68,7 @@
     left: 50%;
     transform: translateX(-50%);
     width: 95%;
-    /* Increased from 90% */
     max-width: 1100px;
-    /* Increased from 800px to fit new menu items */
     height: 70px;
     z-index: 1000;
     display: none;
@@ -59,22 +76,22 @@
     justify-content: space-between;
     padding: 0 24px;
 
-    /* Heavy Glass Effect */
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.75);
+    /* More opaque for premium feel */
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: 100px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.06);
-    overflow: visible;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
 }
 
-/* Logo in Header */
 .brand-logo-small {
     height: 40px;
     width: auto;
     border-radius: 8px;
     transition: transform 0.2s;
+    object-fit: contain;
+    background: transparent;
 }
 
 .brand-logo-small:hover {
@@ -90,8 +107,6 @@
     height: 180px;
     border-radius: 16px;
     margin-bottom: 16px;
-
-    /* Shimmer Effect */
     animation: shimmer 1.5s infinite linear;
     background: linear-gradient(to right,
             rgba(255, 255, 255, 0.1) 0%,
@@ -158,12 +173,10 @@
     width: 100%;
     height: 100%;
     background: rgba(0, 0, 0, 0.4);
-    /* Dim background */
-    backdrop-filter: blur(5px);
-    /* Blur background behind modal */
+    backdrop-filter: blur(8px);
+    /* Increased blur */
     z-index: 1000;
     display: none;
-    /* Hidden by default */
     align-items: center;
     justify-content: center;
     opacity: 0;
@@ -177,22 +190,39 @@
 .modal-content {
     width: 90%;
     max-width: 500px;
-    background: rgba(255, 255, 255, 0.85);
-    /* More opaque than normal cards */
-    padding: 32px;
-    transform: scale(0.95) translateY(20px);
+    max-height: 85vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 40px;
+    /* More breathing room */
+    border-radius: 32px;
+    /* Smoother corners */
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
+    /* Softer, deeper shadow */
+    transform: scale(0.95);
     transition: transform 0.3s var(--ease-ios);
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 480px) {
+    .modal-content {
+        padding: 24px;
+        max-height: 90vh;
+    }
 }
 
 .modal-overlay.active .modal-content {
-    transform: scale(1) translateY(0);
+    transform: scale(1);
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 32px;
+    flex-shrink: 0;
 }
 
 .close-btn {
@@ -201,11 +231,16 @@
     font-size: 24px;
     color: var(--text-secondary);
     cursor: pointer;
+    transition: color 0.2s;
+}
+
+.close-btn:hover {
+    color: var(--text-primary);
 }
 
 /* --- Form Styles --- */
 .form-group {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
     position: relative;
 }
 
@@ -220,18 +255,22 @@ label {
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 8px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 0.75rem;
 }
 
 input,
 select {
     width: 100%;
-    padding: 12px 16px;
-    border-radius: 12px;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    background: rgba(255, 255, 255, 0.5);
+    padding: 14px 18px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    /* Lighter border */
+    background: rgba(255, 255, 255, 0.6);
     font-family: var(--font-body);
     font-size: 1rem;
-    transition: all 0.2s;
+    transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 input:focus,
@@ -240,6 +279,7 @@ select:focus {
     background: white;
     border-color: var(--accent-color);
     box-shadow: 0 0 0 4px var(--accent-glow);
+    transform: translateY(-1px);
 }
 
 /* Input with Icon */
@@ -248,23 +288,25 @@ select:focus {
 }
 
 .input-with-icon input {
-    padding-left: 44px;
+    padding-left: 48px;
 }
 
 .input-icon {
     position: absolute;
-    left: 16px;
+    left: 18px;
     top: 50%;
     transform: translateY(-50%);
     font-size: 1.2rem;
-    opacity: 0.5;
+    opacity: 0.4;
 }
 
 .modal-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
-    margin-top: 32px;
+    gap: 16px;
+    margin-top: 40px;
+    flex-shrink: 0;
+    padding-bottom: 10px;
 }
 
 .btn-text {
@@ -273,28 +315,34 @@ select:focus {
     color: var(--text-secondary);
     font-weight: 600;
     cursor: pointer;
+    transition: color 0.2s;
+}
+
+.btn-text:hover {
+    color: var(--text-primary);
 }
 
 /* --- Card / Item --- */
 .card {
     display: inline-block;
-    /* For column layout */
     width: 100%;
-    /* Fill the column width */
     margin-bottom: 24px;
-    /* Space under each card */
     break-inside: avoid;
-    /* Prevent split in masonry */
-
     background: var(--glass-base);
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border);
-    border-radius: var(--glass-radius);
-    box-shadow: var(--glass-shadow);
-    transition: transform 0.3s var(--ease-ios);
+    border-radius: 24px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s var(--ease-ios);
     position: relative;
-    /* For absolute children (buttons, badges) */
+    overflow: hidden;
+    /* Ensure rounded corners clip content */
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.1);
 }
 
 .card-img-container {
@@ -313,21 +361,21 @@ select:focus {
 }
 
 .card-content {
-    padding: 16px;
+    padding: 20px;
 }
 
 .card h3 {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     margin-bottom: 8px;
-    font-weight: 600;
+    font-weight: 700;
     line-height: 1.3;
+    color: var(--text-primary);
 }
 
 .card-meta {
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
-    /* Align bottom */
     font-size: 0.9rem;
     color: var(--text-secondary);
 }
@@ -335,7 +383,6 @@ select:focus {
 /* --- Gift Button --- */
 .gift-btn {
     color: #34C759;
-    /* Apple Green */
 }
 
 .gift-btn:hover {
@@ -373,7 +420,6 @@ select:focus {
     transform: scale(1.1) !important;
 }
 
-/* Delete Button */
 .delete-btn {
     right: 10px;
     color: #ff3b30;
@@ -384,12 +430,9 @@ select:focus {
     color: white;
 }
 
-/* Edit Button (NEW) */
 .edit-btn {
     right: 50px;
-    /* Positioned to the left of Delete */
     color: #007AFF;
-    /* Apple Blue */
 }
 
 .edit-btn:hover {
@@ -397,7 +440,6 @@ select:focus {
     color: white;
 }
 
-/* Closet Button */
 .closet-btn {
     left: 10px;
     color: #34C759;
@@ -406,6 +448,93 @@ select:focus {
 .closet-btn:hover {
     background: #34C759;
     color: white;
+}
+
+.ai-companion {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 1000;
+    display: flex;
+    align-items: flex-end;
+    /* Align bottom so bubble sits above/beside */
+    gap: 12px;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    pointer-events: none;
+    /* Allow clicks to pass through unless interacting */
+}
+
+/* The Avatar Container */
+.ai-avatar-container {
+    width: 80px;
+    /* Bigger size for visibility */
+    height: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15));
+    transition: transform 0.2s;
+    pointer-events: auto;
+    /* Allow clicking the mascot */
+    cursor: pointer;
+}
+
+.ai-avatar-container:hover {
+    transform: scale(1.1) rotate(5deg);
+}
+
+.ai-mascot-img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    will-change: transform;
+    transition: transform 0.3s var(--ease-spring);
+}
+
+/* The Speech Bubble (Hidden by default) */
+.ai-message-bubble {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    padding: 14px 20px;
+    border-radius: 20px;
+    border-bottom-left-radius: 4px;
+    /* Speech bubble anchor */
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    max-width: 240px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+
+    /* Hide state */
+    opacity: 0;
+    transform: translateY(10px) scale(0.9);
+    transform-origin: bottom left;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    margin-bottom: 40px;
+    /* Push up slightly */
+    pointer-events: auto;
+}
+
+/* Active State (Bubble Visible) */
+.ai-companion.active .ai-message-bubble {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 600px) {
+    .ai-companion {
+        bottom: 80px;
+        /* Above bottom nav/fab */
+        left: 10px;
+    }
+
+    .ai-avatar-container {
+        width: 60px;
+        height: 60px;
+    }
 }
 
 /* --- Board Dashboard Grid --- */
@@ -577,27 +706,52 @@ select:focus {
 
 /* --- Welcome / Hero Screen (REDESIGN) --- */
 .welcome-container {
-    height: 90vh;
+    height: 100vh;
+    /* Use full height */
     display: flex;
     align-items: center;
     justify-content: center;
-    text-align: center;
+    position: relative;
+}
+
+/* A glow behind the card for atmosphere */
+.premium-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+    z-index: 0;
+    pointer-events: none;
 }
 
 .auth-card {
     width: 90%;
     max-width: 440px;
-    padding: 48px;
+    padding: 60px 40px;
+    /* Spacious padding */
     display: flex;
     flex-direction: column;
     align-items: center;
-    animation: fadeUp 0.6s var(--ease-ios);
+    animation: fadeUp 0.8s var(--ease-ios);
+    z-index: 1;
+    /* Above glow */
+
+    /* Stronger Glass */
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(40px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+    border-radius: 32px;
 }
 
 /* Brand Section */
 .brand-hero {
-    margin-bottom: 32px;
+    margin-bottom: 40px;
     animation: float 6s ease-in-out infinite;
+    text-align: center;
 }
 
 .brand-icon {
@@ -608,48 +762,50 @@ select:focus {
 }
 
 .hero-title {
-    font-size: 2.5rem;
+    font-size: 3rem;
+    /* Larger */
     margin-bottom: 8px;
-    /* Gradient Text */
-    background: linear-gradient(135deg, #1D1D1F 0%, #434344 100%);
+    letter-spacing: -1px;
+
+    /* Premium Gradient Text */
+    background: linear-gradient(135deg, #1D1D1F 0%, #555 100%);
     background-clip: text;
     -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text;
 }
 
 .hero-subtitle {
-    font-size: 1rem;
+    font-size: 1.1rem;
     color: var(--text-secondary);
-    line-height: 1.5;
+    font-weight: 500;
 }
 
 /* Auth Segmented Control */
 .auth-tabs {
-    background: rgba(0, 0, 0, 0.04);
-    padding: 4px;
-    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.03);
+    padding: 6px;
+    border-radius: 16px;
     display: flex;
     width: 100%;
-    margin-bottom: 24px;
-    position: relative;
+    margin-bottom: 32px;
 }
 
 .auth-tab {
     flex: 1;
     text-align: center;
-    padding: 10px;
-    font-size: 0.9rem;
+    padding: 12px;
+    font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 12px;
     transition: all 0.3s var(--ease-ios);
-    z-index: 2;
 }
 
 .auth-tab.active {
     background: white;
     color: var(--text-primary);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 .social-divider {
@@ -1257,15 +1413,12 @@ select:focus {
     top: 12px;
     right: 12px;
     background: rgba(255, 215, 0, 0.9);
-    /* Gold */
     color: #5a4a00;
     font-size: 0.75rem;
     font-weight: 700;
     padding: 4px 8px;
     border-radius: 12px;
     z-index: 10;
-    box-shadow: 0 4px 10px rgba(255, 215, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
 .original-price {
@@ -1317,7 +1470,6 @@ select:focus {
     gap: 12px;
 }
 
-/* --- Toggle Switch for Settings (Task 2.3) --- */
 .toggle-switch-label {
     position: relative;
     display: inline-block;
