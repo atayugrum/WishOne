@@ -29,11 +29,11 @@ function getCountdown(dateString) {
     if (diffDays === 0) return { text: i18n.t('time.today') || "Today!", class: "tag-urgent", days: 0 };
     if (diffDays <= 7) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-urgent", days: diffDays };
     if (diffDays <= 30) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-soon", days: diffDays };
-    
+
     const months = Math.round(diffDays / 30);
     if (months <= 1) return { text: i18n.t('time.next_month') || "Next Month", class: "tag-far", days: diffDays };
     if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} ${i18n.t('time.years') || "years"}`, class: "tag-far", days: diffDays };
-    
+
     return { text: `in ${months} ${i18n.t('time.months') || "months"}`, class: "tag-far", days: diffDays };
 }
 
@@ -106,6 +106,26 @@ export const HomeView = {
             HomeView.loadData();
         };
 
+        // --- SHARE HANDLER ---
+        window.handleShareList = () => {
+            const user = authService.currentUser;
+            if (!user) return;
+
+            // Check privacy using cached profile
+            const profile = authService.userProfile;
+            if (profile && profile.isPrivate) {
+                if (!confirm(i18n.t('home.share_private_warn'))) return;
+            }
+
+            const url = `${window.location.origin}/#/share?uid=${user.uid}`;
+            navigator.clipboard.writeText(url).then(() => {
+                window.showToast(i18n.t('home.share_copy'), "🔗");
+            }).catch(err => {
+                console.error('Copy failed', err);
+                alert(i18n.t('common.error'));
+            });
+        };
+
         window.openPlannerModal = () => {
             const itemCount = itemsMap.size;
             if (itemCount < 3) {
@@ -127,13 +147,13 @@ export const HomeView = {
             const resultsDiv = document.getElementById('planner-results');
             if (!budget) return alert("Enter budget.");
             resultsDiv.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
-            if(window.aiCompanion) window.aiCompanion.say("Crunching the numbers...", "thinking");
+            if (window.aiCompanion) window.aiCompanion.say("Crunching the numbers...", "thinking");
             try {
                 const items = await firestoreService.getWishlist(authService.currentUser.uid);
                 const data = await apiCall('/api/ai/purchase-planner', 'POST', { wishlistItems: items, budget, currency: 'TRY' });
                 authService.trackFeatureUsage(FEATURES.AI_PLANNER);
                 if (data.recommendedItems) {
-                    if(window.aiCompanion) window.aiCompanion.say("Here is a plan for you!", "presenting");
+                    if (window.aiCompanion) window.aiCompanion.say("Here is a plan for you!", "presenting");
                     resultsDiv.innerHTML = `
                         <div style="background:rgba(255,255,255,0.5); padding:10px; border-radius:8px; margin-bottom:10px;"><strong>Plan:</strong> ${data.summary}</div>
                         ${data.recommendedItems.map(rec => { const item = items.find(i => i.id === rec.itemId); return item ? `<div class="glass-panel" style="padding:8px; margin-bottom:5px;"><b>${item.title}</b><br><small>${rec.reason}</small></div>` : ''; }).join('')}
@@ -161,6 +181,7 @@ export const HomeView = {
                 
                 <div class="view-toggle">
                     <button class="btn-magic" onclick="window.openPlannerModal()" style="margin-right:12px;">💰</button>
+                    <button class="toggle-btn" onclick="window.handleShareList()" title="${i18n.t('home.share_btn')}" style="margin-right:12px;">🔗</button>
                     <button id="btn-sale-filter" class="toggle-btn" onclick="window.toggleSaleFilter()" title="${i18n.t('home.sale_filter')}" style="margin-right:12px;">%</button>
                     <button id="btn-grid" class="toggle-btn active" onclick="window.setView('grid')">⊞</button>
                     <button id="btn-timeline" class="toggle-btn" onclick="window.setView('timeline')">☰</button>
@@ -206,7 +227,7 @@ export const HomeView = {
         try {
             // CRITICAL FIX: Pass user.uid as second arg to see own private items
             const [items, closetItems] = await Promise.all([
-                firestoreService.getWishlist(user.uid, user.uid), 
+                firestoreService.getWishlist(user.uid, user.uid),
                 firestoreService.getCloset(user.uid)
             ]);
 
@@ -218,7 +239,7 @@ export const HomeView = {
 
             const activityContainer = document.getElementById('activity-log-container');
             const activityList = document.getElementById('activity-list');
-            
+
             if (window.innerWidth > 1000) {
                 const activities = await firestoreService.getRecentActivities(user.uid);
                 if (activities.length > 0) {
@@ -230,7 +251,7 @@ export const HomeView = {
                         if (act.type === 'friend_add') text = `Added <strong>${act.details.name}</strong> as friend`;
                         if (act.type === 'create_board') text = `Created board <strong>${act.details.title}</strong>`;
                         if (act.type === 'return_wish') text = `Returned <strong>${act.details.title}</strong> to list`;
-                        
+
                         return `
                             <div class="glass-panel" style="padding:10px; margin-bottom:8px; font-size:0.8rem;">
                                 <span>${text}</span>
@@ -278,10 +299,10 @@ export const HomeView = {
     },
 
     renderCard: (item) => {
-        const catConfig = CATEGORIES[item.category] || (item.category ? { icon:'✨', color:'#ccc', label: item.category } : CATEGORIES['Other']);
+        const catConfig = CATEGORIES[item.category] || (item.category ? { icon: '✨', color: '#ccc', label: item.category } : CATEGORIES['Other']);
         const icon = catConfig ? catConfig.icon : '📦';
         const subText = item.subcategory ? `• ${item.subcategory}` : '';
-        
+
         const timeData = getCountdown(item.targetDate);
         let badges = '';
         if (timeData) badges += `<span class="time-tag ${timeData.class}" style="display: inline-flex;">⏳ ${timeData.text}</span>`;

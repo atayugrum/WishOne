@@ -9,7 +9,7 @@ export const TRANSLATIONS = {
         },
         welcome: {
             slogan: "Curate your life. Manifest your dreams.",
-            by: "WishOne by AtOne", // Branding text
+            by: "WishOne by AtOne",
             about: "About WishOne",
             about_title: "About WishOne & AtOne",
             about_text: "WishOne is an AI-powered social wishlist experience designed to help you visualize and achieve your goals.",
@@ -24,7 +24,6 @@ export const TRANSLATIONS = {
             birthday: "Your Birthday",
             complete: "Start Manifesting"
         },
-        // ... (Keep existing home, friends, inspo, etc. translations as is)
         home: {
             title: "My Wishlist",
             subtitle: "Everything you're manifesting.",
@@ -35,7 +34,11 @@ export const TRANSLATIONS = {
             public_badge: "🌍 Public",
             planner_locked: "Add at least 3 items to unlock the AI Planner.",
             tutorial_title: "Welcome to WishOne!",
-            tutorial_text: "Here you can collect wishes, organize them into boards, and plan your purchases with AI."
+            tutorial_text: "Here you can collect wishes, organize them into boards, and plan your purchases with AI.",
+            // --- NEW SHARE KEYS ---
+            share_btn: "Share Link",
+            share_copy: "Link copied to clipboard!",
+            share_private_warn: "Your list is set to Private. Others won't be able to see it. Copy link anyway?"
         },
         friends: {
             title: "Friends",
@@ -179,7 +182,6 @@ export const TRANSLATIONS = {
             birthday: "Doğum Günün",
             complete: "Başla"
         },
-        // ... (Keep existing home, friends, inspo, etc. translations as is)
         home: {
             title: "İstek Listem",
             subtitle: "Hayal ettiğin her şey.",
@@ -190,7 +192,11 @@ export const TRANSLATIONS = {
             public_badge: "🌍 Herkes",
             planner_locked: "AI Planlayıcıyı açmak için en az 3 ürün ekle.",
             tutorial_title: "WishOne'a Hoşgeldin!",
-            tutorial_text: "Burada isteklerini toplayabilir, panolarda düzenleyebilir ve yapay zeka ile satın alma planı yapabilirsin."
+            tutorial_text: "Burada isteklerini toplayabilir, panolarda düzenleyebilir ve yapay zeka ile satın alma planı yapabilirsin.",
+            // --- NEW SHARE KEYS ---
+            share_btn: "Listeyi Paylaş",
+            share_copy: "Link kopyalandı!",
+            share_private_warn: "Listeniz Gizli. Başkaları göremez. Yine de kopyala?"
         },
         friends: {
             title: "Arkadaşlar",
