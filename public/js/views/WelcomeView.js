@@ -1,4 +1,5 @@
 import { authService } from '../services/AuthService.js';
+import { i18n } from '../services/LocalizationService.js';
 
 export const WelcomeView = {
     render: async () => {
@@ -7,6 +8,18 @@ export const WelcomeView = {
         window.setAuthMode = (mode) => {
             isLoginMode = mode === 'login';
             updateUI();
+        };
+
+        window.toggleLang = () => {
+            i18n.toggle();
+            // Re-render
+            document.getElementById('app').innerHTML = ''; // Force clear
+            WelcomeView.render().then(html => document.getElementById('app').innerHTML = html);
+        };
+
+        window.toggleAbout = () => {
+            const el = document.getElementById('about-modal');
+            el.style.display = el.style.display === 'none' ? 'flex' : 'none';
         };
 
         const updateUI = () => {
@@ -42,7 +55,7 @@ export const WelcomeView = {
 
             errorMsg.style.display = 'none';
             btn.disabled = true;
-            btn.textContent = "Processing...";
+            btn.textContent = i18n.t('common.loading');
 
             try {
                 if (isLoginMode) {
@@ -50,11 +63,12 @@ export const WelcomeView = {
                 } else {
                     await authService.registerWithEmail(email, password, name);
                 }
+                // Auth listener in app.js handles redirect
             } catch (error) {
                 let message = "Authentication failed.";
                 if (error.code === 'auth/invalid-credential') message = "Invalid email or password.";
                 if (error.code === 'auth/email-already-in-use') message = "Email already registered.";
-                if (error.code === 'auth/weak-password') message = "Password should be at least 6 characters.";
+                if (error.code === 'auth/weak-password') message = "Password too short.";
                 errorMsg.textContent = message;
                 errorMsg.style.display = 'block';
                 btn.disabled = false;
@@ -66,17 +80,23 @@ export const WelcomeView = {
             try { await authService.login(); } catch (error) { alert("Google Login failed."); }
         };
 
-        setTimeout(() => updateUI(), 0);
+        setTimeout(() => { if(document.getElementById('auth-submit-btn')) updateUI(); }, 0);
+
+        // Mascot: Simple greeting
+        if (window.aiCompanion) window.aiCompanion.say("Hello! I'm your WishOne guide.", "welcome");
 
         return `
             <div class="welcome-container">
                 <div class="premium-glow"></div>
 
+                <button onclick="window.toggleLang()" class="btn-text" style="position:absolute; top:20px; right:20px; z-index:10; font-weight:bold;">${i18n.lang.toUpperCase()}</button>
+
                 <div class="glass-panel auth-card">
                     <div class="brand-hero">
-                        <img src="/img/logo.png" alt="WishOne" style="width: 140px; border-radius: 28px; box-shadow: 0 15px 40px rgba(0,0,0,0.1); margin-bottom: 24px; object-fit: cover;" onerror="this.style.display='none'">
-                        <h1 class="hero-title">WishOne</h1>
-                        <p class="hero-subtitle">Zen. Fluid. Emotional.</p>
+                        <img src="/img/icon.png" alt="WishOne" style="width: 64px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); margin-bottom: 16px; object-fit: contain;">
+                        <h1 class="hero-title" style="font-size:2rem;">WishOne</h1>
+                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-top:-4px;">${i18n.t('welcome.by')}</p>
+                        <p class="hero-subtitle" style="margin-top:12px; font-style:italic;">"${i18n.t('welcome.slogan')}"</p>
                     </div>
 
                     <div class="auth-tabs">
@@ -86,8 +106,8 @@ export const WelcomeView = {
 
                     <form onsubmit="window.handleAuthSubmit(event)" style="width: 100%;">
                         <div class="form-group" id="field-name" style="display:none; animation: fadeUp 0.3s;">
-                            <label>Full Name</label>
-                            <div class="input-with-icon"><span class="input-icon">👤</span><input type="text" id="name" placeholder="Your Name"></div>
+                            <label>${i18n.t('profile.fullname')}</label>
+                            <div class="input-with-icon"><span class="input-icon">👤</span><input type="text" id="name" placeholder="Name"></div>
                         </div>
                         <div class="form-group">
                             <label>Email</label>
@@ -101,10 +121,21 @@ export const WelcomeView = {
                         <button type="submit" id="auth-submit-btn" class="btn-primary" style="width: 100%;">Log In</button>
                     </form>
 
-                    <div class="social-divider" style="margin: 32px 0;"><span>OR CONTINUE WITH</span></div>
+                    <div class="social-divider" style="margin: 24px 0;"><span>${i18n.t('common.or')}</span></div>
                     <button class="btn-primary btn-google" onclick="window.handleGoogleLogin()" style="width: 100%; background: white; color: #1D1D1F; border: 1px solid rgba(0,0,0,0.1);">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" height="18"><span>Google</span>
                     </button>
+
+                    <button class="btn-text" onclick="window.toggleAbout()" style="margin-top:24px; font-size:0.8rem; opacity:0.7;">${i18n.t('welcome.about')}</button>
+                </div>
+            </div>
+
+            <div id="about-modal" class="modal-overlay">
+                <div class="modal-content" style="text-align:center;">
+                    <div class="modal-header" style="justify-content:center;"><h3>${i18n.t('welcome.about')}</h3></div>
+                    <p style="margin-bottom:24px;">${i18n.t('welcome.about_text')}</p>
+                    <p style="font-size:0.8rem; color:var(--text-tertiary);">${i18n.t('welcome.rights')}</p>
+                    <button class="btn-primary" onclick="window.toggleAbout()" style="margin-top:20px;">Close</button>
                 </div>
             </div>
         `;

@@ -20,22 +20,7 @@ const Logger = {
     warn: (event, data = {}) => console.log(JSON.stringify({ level: 'WARN', timestamp: new Date(), event, ...data }))
 };
 
-// Request Logging Middleware
-app.use((req, res, next) => {
-    const start = Date.now();
-    res.on('finish', () => {
-        Logger.info('API_REQUEST', {
-            method: req.method,
-            path: req.path,
-            status: res.statusCode,
-            duration: `${Date.now() - start}ms`
-        });
-    });
-    next();
-});
-
 // --- CONFIGURATION ---
-// FIX: Use process.env directly. Cloud Functions loads variables into process.env automatically.
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const SCHEDULER_SECRET = process.env.SCHEDULER_SECRET;
 
@@ -66,7 +51,7 @@ const CATEGORY_MAP = {
 };
 
 const ALLOWED_MOODS = [
-    'idle', 'welcome', 'thinking', 'magic', 'celebrating',
+    'idle', 'welcome', 'thinking', 'magic', 'celebrating', 
     'dancing', 'loving', 'zen', 'presenting', 'error'
 ];
 
@@ -119,13 +104,13 @@ async function scrapeProduct(url) {
         const html = await response.text();
         const $ = cheerio.load(html);
         const getMeta = (p) => $(`meta[property="${p}"]`).attr('content') || $(`meta[name="${p}"]`).attr('content');
-
+        
         let title = getMeta('og:title') || $('title').text() || '';
         let image = getMeta('og:image') || $('link[rel="image_src"]').attr('href');
         let description = getMeta('og:description') || '';
         let rawPrice = getMeta('product:price:amount') || getMeta('og:price:amount');
         let currency = getMeta('product:price:currency') || getMeta('og:price:currency') || 'TRY';
-
+        
         if (!rawPrice) {
             const txt = $('.price, .product-price, .a-price-whole').first().text().trim();
             if (txt) rawPrice = txt;
@@ -165,7 +150,7 @@ app.post('/api/product/metadata', async (req, res) => {
                 data.priorityLabel = aiData.priorityLabel;
                 data.reason = aiData.reason;
                 if (!data.price) data.price = aiData.estimatedPrice;
-
+                
                 Logger.metric('ai_enrichment_success');
             } catch (e) { Logger.error("AI_ENRICH_FAIL", e); }
         }
@@ -181,11 +166,11 @@ app.post('/api/ai/combo-suggestions', async (req, res) => {
     try {
         const { closetItems } = req.body;
         if (!genAI) return res.status(503).json({ error: 'AI unavailable' });
-
+        
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `Stylist Task: Create 1-3 outfits from: ${JSON.stringify(closetItems.map(i => ({ id: i.id, name: i.title, cat: i.category })))}. Output strict JSON only. No markdown. JSON: { "combos": [{ "name": "String", "description": "String", "itemIds": ["id1"] }] }`;
         const result = await model.generateContent(prompt);
-
+        
         const json = cleanAndParseJSON(result.response.text());
         res.json(json);
     } catch (e) {
@@ -204,7 +189,7 @@ app.post('/api/ai/purchase-planner', async (req, res) => {
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `Budget: ${budget} ${currency}. Items: ${JSON.stringify(wishlistItems.map(i => ({ id: i.id, name: i.title, price: i.price, priority: i.priority })))}. Pick items. Output strict JSON only. No markdown. No comments. JSON: { "recommendedItems": [{ "itemId": "String", "reason": "String" }], "summary": "String" }`;
         const result = await model.generateContent(prompt);
-
+        
         const json = cleanAndParseJSON(result.response.text());
         res.json(json);
     } catch (e) {
@@ -221,11 +206,12 @@ app.get('/api/currency/rates', (req, res) => {
 // 5. AI Reaction (Dynamic Mascot)
 app.post('/api/ai/reaction', async (req, res) => {
     try {
-        const { context, userAction } = req.body;
-
+        const { context, userAction } = req.body; 
+        
         if (!genAI) return res.json({ message: "That looks amazing!", mood: "presenting" });
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        
         const prompt = `
             You are a Zen, friendly AI mascot for a wishlist app called WishOne.
             User Action: ${userAction}
@@ -237,7 +223,7 @@ app.post('/api/ai/reaction', async (req, res) => {
         res.json(cleanAndParseJSON(result.response.text()));
     } catch (error) {
         Logger.error("AI_REACTION_FAIL", error);
-        res.json({ message: "Stored safely.", mood: "idle" });
+        res.json({ message: "Stored safely.", mood: "idle" }); 
     }
 });
 
@@ -270,8 +256,7 @@ app.post('/api/ai/compatibility', async (req, res) => {
 // 8. PRICE REFRESH JOB
 app.post('/api/jobs/refresh-prices', async (req, res) => {
     if (!db) return res.status(500).json({ error: 'Firestore not connected' });
-
-    // --- SECURITY CHECK ---
+    
     const authHeader = req.headers['x-scheduler-secret'];
     if (authHeader !== SCHEDULER_SECRET) {
         Logger.warn("JOB_UNAUTHORIZED_ATTEMPT");
@@ -292,7 +277,7 @@ app.post('/api/jobs/refresh-prices', async (req, res) => {
         for (const doc of snapshot.docs) {
             const item = doc.data();
             const newData = await scrapeProduct(item.originalUrl);
-
+            
             if (newData.price && newData.price !== item.price) {
                 updates.push({ id: doc.id, old: item.price, new: newData.price });
                 await doc.ref.update({

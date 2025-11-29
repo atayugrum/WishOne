@@ -8,14 +8,34 @@ import { apiCall } from '../config/api.js';
 import { FEATURES } from '../config/limits.js';
 import { premiumModal } from '../components/PremiumModal.js';
 import { GamificationService } from '../services/GamificationService.js';
-import { aiService } from '../services/AIService.js'; // Import AI Service
+import { aiService } from '../services/AIService.js';
 
 let addItemModal = null;
 let currentView = 'grid';
 let itemsMap = new Map();
 let showSaleOnly = false;
 
-function getCountdown(dateString) { if (!dateString) return null; const target = new Date(dateString); if (isNaN(target.getTime())) return null; const today = new Date(); today.setHours(0, 0, 0, 0); target.setHours(0, 0, 0, 0); const diffTime = target - today; const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); if (diffDays < 0) return { text: "Overdue", class: "tag-overdue", days: diffDays }; if (diffDays === 0) return { text: "Today!", class: "tag-urgent", days: 0 }; if (diffDays <= 7) return { text: `${diffDays} days left`, class: "tag-urgent", days: diffDays }; if (diffDays <= 30) return { text: `${diffDays} days left`, class: "tag-soon", days: diffDays }; const months = Math.round(diffDays / 30); if (months <= 1) return { text: "Next Month", class: "tag-far", days: diffDays }; if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} years`, class: "tag-far", days: diffDays }; return { text: `in ${months} months`, class: "tag-far", days: diffDays }; }
+function getCountdown(dateString) {
+    if (!dateString) return null;
+    const target = new Date(dateString);
+    if (isNaN(target.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+    const diffTime = target - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return { text: i18n.t('time.overdue') || "Overdue", class: "tag-overdue", days: diffDays };
+    if (diffDays === 0) return { text: i18n.t('time.today') || "Today!", class: "tag-urgent", days: 0 };
+    if (diffDays <= 7) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-urgent", days: diffDays };
+    if (diffDays <= 30) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-soon", days: diffDays };
+    
+    const months = Math.round(diffDays / 30);
+    if (months <= 1) return { text: i18n.t('time.next_month') || "Next Month", class: "tag-far", days: diffDays };
+    if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} ${i18n.t('time.years') || "years"}`, class: "tag-far", days: diffDays };
+    
+    return { text: `in ${months} ${i18n.t('time.months') || "months"}`, class: "tag-far", days: diffDays };
+}
 
 window.showToast = (message, icon = "✨") => {
     const existing = document.querySelector('.toast-notification');
@@ -48,10 +68,7 @@ export const HomeView = {
             if (confirm(i18n.t('common.confirm'))) {
                 const card = document.querySelector(`[data-id="${itemId}"]`);
                 if (card) { card.style.transform = 'scale(0.9)'; card.style.opacity = '0'; }
-
-                // AI Reaction for deleting (e.g., "Letting go is good.")
                 if (item) aiService.triggerReaction('delete_wish', item);
-
                 await firestoreService.deleteItem(itemId);
                 HomeView.loadData();
             }
@@ -66,13 +83,9 @@ export const HomeView = {
             const item = itemsMap.get(itemId);
             const card = document.querySelector(`[data-id="${itemId}"]`);
             if (card) { card.style.transform = 'scale(1.1) translateY(-10px)'; card.style.opacity = '0'; }
-
             GamificationService.triggerConfetti();
             window.showToast("Manifested! Moved to Closet.", "🎉");
-
-            // AI Reaction for Manifesting (e.g. "Celebrating" mood)
-            if (item) aiService.triggerReaction('manifest', item);
-
+            if (item) aiService.triggerReaction('manifest', { title: item.title });
             setTimeout(async () => {
                 await firestoreService.markAsOwned(itemId);
                 HomeView.loadData();
@@ -94,6 +107,11 @@ export const HomeView = {
         };
 
         window.openPlannerModal = () => {
+            const itemCount = itemsMap.size;
+            if (itemCount < 3) {
+                alert(i18n.t('home.planner_locked'));
+                return;
+            }
             if (!authService.canUseFeature(FEATURES.AI_PLANNER)) { premiumModal.open(); return; }
             const modal = document.getElementById('planner-modal');
             if (modal) { modal.style.display = 'flex'; requestAnimationFrame(() => modal.classList.add('active')); }
@@ -109,18 +127,13 @@ export const HomeView = {
             const resultsDiv = document.getElementById('planner-results');
             if (!budget) return alert("Enter budget.");
             resultsDiv.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
-
-            // Mascot Thinking Mood
-            if (window.aiCompanion) window.aiCompanion.say("Crunching the numbers...", "thinking");
-
+            if(window.aiCompanion) window.aiCompanion.say("Crunching the numbers...", "thinking");
             try {
                 const items = await firestoreService.getWishlist(authService.currentUser.uid);
                 const data = await apiCall('/api/ai/purchase-planner', 'POST', { wishlistItems: items, budget, currency: 'TRY' });
                 authService.trackFeatureUsage(FEATURES.AI_PLANNER);
-
                 if (data.recommendedItems) {
-                    if (window.aiCompanion) window.aiCompanion.say("Here is a plan for you!", "presenting");
-
+                    if(window.aiCompanion) window.aiCompanion.say("Here is a plan for you!", "presenting");
                     resultsDiv.innerHTML = `
                         <div style="background:rgba(255,255,255,0.5); padding:10px; border-radius:8px; margin-bottom:10px;"><strong>Plan:</strong> ${data.summary}</div>
                         ${data.recommendedItems.map(rec => { const item = items.find(i => i.id === rec.itemId); return item ? `<div class="glass-panel" style="padding:8px; margin-bottom:5px;"><b>${item.title}</b><br><small>${rec.reason}</small></div>` : ''; }).join('')}
@@ -128,6 +141,14 @@ export const HomeView = {
                 } else { resultsDiv.innerHTML = `<p>No plan.</p>`; }
             } catch (error) { resultsDiv.innerHTML = `<p style="color:#ff3b30">Error: ${error.message}</p>`; }
         };
+
+        setTimeout(() => {
+            const hasSeenTutorial = localStorage.getItem('hasSeenV3Tutorial');
+            if (!hasSeenTutorial && authService.currentUser) {
+                alert(`${i18n.t('home.tutorial_title')}\n\n${i18n.t('home.tutorial_text')}`);
+                localStorage.setItem('hasSeenV3Tutorial', 'true');
+            }
+        }, 1500);
 
         setTimeout(() => HomeView.loadData(), 0);
 
@@ -159,7 +180,10 @@ export const HomeView = {
                 </div>
             </div>
             
-            <button class="fab-add" onclick="window.openAddModal()">+</button>
+            <button class="fab-add" onclick="window.openAddModal()" style="width:auto; padding:0 24px; border-radius:100px;">
+                <span style="font-size:24px; margin-right:8px;">+</span> 
+                <span style="font-size:16px; font-weight:600;">${i18n.t('home.addBtn')}</span>
+            </button>
 
             <div id="planner-modal" class="modal-overlay">
                 <div class="modal-content">
@@ -180,8 +204,9 @@ export const HomeView = {
         if (!user) { container.innerHTML = `<div class="empty-state">Login required.</div>`; return; }
 
         try {
+            // CRITICAL FIX: Pass user.uid as second arg to see own private items
             const [items, closetItems] = await Promise.all([
-                firestoreService.getWishlist(user.uid),
+                firestoreService.getWishlist(user.uid, user.uid), 
                 firestoreService.getCloset(user.uid)
             ]);
 
@@ -191,9 +216,9 @@ export const HomeView = {
             GamificationService.checkMilestones('add_item', items.length);
             GamificationService.checkMilestones('manifest', closetItems.length);
 
-            // Activity Log
             const activityContainer = document.getElementById('activity-log-container');
             const activityList = document.getElementById('activity-list');
+            
             if (window.innerWidth > 1000) {
                 const activities = await firestoreService.getRecentActivities(user.uid);
                 if (activities.length > 0) {
@@ -204,7 +229,8 @@ export const HomeView = {
                         if (act.type === 'manifest') text = `Manifested <strong>${act.details.title}</strong> ✨`;
                         if (act.type === 'friend_add') text = `Added <strong>${act.details.name}</strong> as friend`;
                         if (act.type === 'create_board') text = `Created board <strong>${act.details.title}</strong>`;
-
+                        if (act.type === 'return_wish') text = `Returned <strong>${act.details.title}</strong> to list`;
+                        
                         return `
                             <div class="glass-panel" style="padding:10px; margin-bottom:8px; font-size:0.8rem;">
                                 <span>${text}</span>
@@ -222,71 +248,51 @@ export const HomeView = {
                 if (!showSaleOnly) {
                     content = `
                         <div class="empty-actions">
-                            <button class="btn-primary" onclick="window.openAddModal()" style="width:100%">+ ${i18n.t('home.addBtn')}</button>
-                            <button class="btn-primary btn-google" onclick="window.openAddModal(); setTimeout(() => document.getElementById('btn-magic-add').click(), 200);" style="width:100%">${i18n.t('modal.magic')}</button>
+                            <button class="btn-primary" onclick="window.openAddModal()" style="width:100%">
+                                + ${i18n.t('home.addBtn')}
+                            </button>
+                            <button class="btn-primary btn-google" onclick="window.openAddModal(); setTimeout(() => document.getElementById('btn-magic-add').click(), 200);" style="width:100%">
+                                ${i18n.t('modal.magic')}
+                            </button>
                         </div>
                     `;
                 }
-                container.innerHTML = `
-                    <div class="glass-panel empty-state-card">
-                        <span class="empty-icon">💭</span>
-                        <h2 class="empty-title">${i18n.t('home.empty')}</h2>
-                        ${content}
-                    </div>
-                `;
+                container.innerHTML = `<div class="glass-panel empty-state-card"><span class="empty-icon">💭</span><h2 class="empty-title">${i18n.t('home.empty')}</h2>${content}</div>`;
                 return;
             }
 
-            if (currentView === 'grid') {
-                let gridHtml = '';
-                displayItems.forEach((item, index) => {
-                    gridHtml += HomeView.renderCard(item);
-                    if (!authService.isPremium && (index + 1) % 5 === 0) {
-                        const ad = new AdSlot({ provider: 'adsense' });
-                        gridHtml += `<div class="ad-wrapper">${ad.getElement().outerHTML}</div>`;
-                    }
-                });
-                container.innerHTML = `<div class="masonry-grid">` + gridHtml + `</div>`;
-                container.querySelectorAll('.ad-slot').forEach(el => el.addEventListener('click', () => premiumModal.open()));
-            } else {
-                container.innerHTML = HomeView.renderTimeline(displayItems);
-            }
+            let gridHtml = '';
+            displayItems.forEach((item, index) => {
+                gridHtml += HomeView.renderCard(item);
+                if (!authService.isPremium && (index + 1) % 4 === 0) {
+                    const ad = new AdSlot({ provider: 'adsense' });
+                    gridHtml += `<div class="ad-wrapper">${ad.getElement().outerHTML}</div>`;
+                }
+            });
+            container.innerHTML = `<div class="masonry-grid">` + gridHtml + `</div>`;
+            container.querySelectorAll('.ad-slot').forEach(el => el.addEventListener('click', () => premiumModal.open()));
 
         } catch (error) {
-            console.error("HomeView Load Error:", error);
             container.innerHTML = `<div class="empty-state">${i18n.t('common.error')} <button class="btn-text" onclick="HomeView.loadData()">Retry</button></div>`;
         }
     },
 
     renderCard: (item) => {
-        const catConfig = CATEGORIES[item.category] || (item.category ? { icon: '✨', color: '#ccc' } : CATEGORIES['Other']);
+        const catConfig = CATEGORIES[item.category] || (item.category ? { icon:'✨', color:'#ccc', label: item.category } : CATEGORIES['Other']);
         const icon = catConfig ? catConfig.icon : '📦';
         const subText = item.subcategory ? `• ${item.subcategory}` : '';
+        
         const timeData = getCountdown(item.targetDate);
-
         let badges = '';
-        if (timeData) {
-            badges += `<span class="time-tag ${timeData.class}" style="display: inline-flex;">⏳ ${timeData.text}</span>`;
-        }
-        if (item.occasion) {
-            badges += `<span class="time-tag tag-far" style="display: inline-flex; margin-left:4px;">🎉 ${item.occasion}</span>`;
-        }
-        if (item.visibility === 'private') {
-            badges += `<span class="time-tag tag-far" style="display: inline-flex; margin-left:4px; background:rgba(0,0,0,0.05); color:var(--text-primary);">${i18n.t('home.private_badge')}</span>`;
-        }
+        if (timeData) badges += `<span class="time-tag ${timeData.class}" style="display: inline-flex;">⏳ ${timeData.text}</span>`;
+        if (item.occasion) badges += `<span class="time-tag tag-far" style="display: inline-flex; margin-left:4px;">🎉 ${item.occasion}</span>`;
+        if (item.visibility === 'private') badges += `<span class="time-tag tag-far" style="display: inline-flex; margin-left:4px; background:rgba(0,0,0,0.05); color:var(--text-primary);">${i18n.t('home.private_badge')}</span>`;
 
         let topBadge = '';
         let priceDisplay = `<span class="price">${item.price} ${item.currency}</span>`;
-
         if (item.onSale && item.originalPrice && item.price < item.originalPrice) {
-            const discount = item.discountPercent || Math.round(((item.originalPrice - item.price) / item.originalPrice) * 100);
-            topBadge = `<div class="tag-sale">On Sale ${discount > 0 ? ` -${discount}%` : ''}</div>`;
-            priceDisplay = `
-                <div style="display:flex; flex-direction:column; align-items:flex-end;">
-                    <span class="original-price">${item.originalPrice} ${item.currency}</span>
-                    <span class="price sale-price">${item.price} ${item.currency}</span>
-                </div>
-            `;
+            topBadge = `<div class="tag-sale">On Sale</div>`;
+            priceDisplay = `<div style="display:flex; flex-direction:column; align-items:flex-end;"><span class="original-price">${item.originalPrice} ${item.currency}</span><span class="price sale-price">${item.price} ${item.currency}</span></div>`;
         }
 
         return `
@@ -294,18 +300,11 @@ export const HomeView = {
                 <button class="card-action-btn delete-btn" onclick="window.handleDeleteItem('${item.id}')" title="${i18n.t('common.delete')}">&times;</button>
                 <button class="card-action-btn edit-btn" onclick="window.handleEditItem('${item.id}')" title="${i18n.t('common.edit')}">✎</button>
                 <button class="card-action-btn closet-btn" onclick="window.handleMoveToCloset('${item.id}')" title="Moved to Closet">✔</button>
-                
-                <div class="card-img-container">
-                    ${topBadge}
-                    <img src="${item.imageUrl || 'https://placehold.co/600x400'}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
-                </div>
+                <div class="card-img-container">${topBadge}<img src="${item.imageUrl || 'https://placehold.co/600x400'}" class="card-img" onerror="this.src='https://placehold.co/600x400'"></div>
                 <div class="card-content">
                     <h3>${item.title}</h3>
                     <div style="margin-bottom:8px;">${badges}</div>
-                    <div class="card-meta">
-                        <span class="tag">${icon} ${item.category} ${subText}</span>
-                        ${priceDisplay}
-                    </div>
+                    <div class="card-meta"><span class="tag">${icon} ${item.category || catConfig.label} ${subText}</span>${priceDisplay}</div>
                 </div>
             </article>
         `;

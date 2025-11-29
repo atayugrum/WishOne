@@ -1,9 +1,9 @@
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
 import { i18n } from '../services/LocalizationService.js';
-import { apiCall } from '../config/api.js';
+import { apiCall } from '../config/api.js'; 
 import { premiumModal } from '../components/PremiumModal.js';
-import { aiService } from '../services/AIService.js'; // Import AI
+import { aiService } from '../services/AIService.js'; 
 
 export const FriendsView = {
     render: async () => {
@@ -25,20 +25,18 @@ export const FriendsView = {
             try {
                 btn.innerHTML = `<span class="spinner-small"></span>`;
                 btn.disabled = true;
-
-                // Mascot Thinking
-                if (window.aiCompanion) window.aiCompanion.setState('thinking');
+                
+                if(window.aiCompanion) window.aiCompanion.setState('thinking');
 
                 await firestoreService.addFriend(user.uid, email);
-
-                // AI Reaction: Celebrating friendship
+                
                 aiService.triggerReaction('friend_add', { name: 'New Friend' });
 
                 window.showToast("Friend added!", "👋");
                 document.getElementById('app').innerHTML = await FriendsView.render();
             } catch (error) {
                 alert(error.message);
-                if (window.aiCompanion) window.aiCompanion.say("I couldn't find them.", "error");
+                if(window.aiCompanion) window.aiCompanion.say("I couldn't find them.", "error");
                 btn.textContent = i18n.t('friends.add');
                 btn.disabled = false;
             }
@@ -50,7 +48,7 @@ export const FriendsView = {
         };
 
         window.handleCheckCompatibility = async (e, friendId, friendName) => {
-            e.stopPropagation();
+            e.stopPropagation(); 
             if (!authService.isPremium) { premiumModal.open(); return; }
 
             const card = e.target.closest('.friend-card');
@@ -59,9 +57,8 @@ export const FriendsView = {
             resultDiv.style.marginTop = '12px';
             resultDiv.innerHTML = `<div class="loading-spinner">${i18n.t('friends.analyzing')}</div>`;
             card.after(resultDiv);
-
-            // Mascot: Magic/Divination pose
-            if (window.aiCompanion) window.aiCompanion.say("Reading the stars...", "magic");
+            
+            if(window.aiCompanion) window.aiCompanion.say("Reading the stars...", "magic");
 
             try {
                 const [myItems, friendItems] = await Promise.all([
@@ -75,7 +72,7 @@ export const FriendsView = {
                     names: { user: 'You', friend: friendName }
                 });
 
-                if (window.aiCompanion) window.aiCompanion.say("The results are in!", "presenting");
+                if(window.aiCompanion) window.aiCompanion.say("The results are in!", "presenting");
 
                 resultDiv.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -89,7 +86,7 @@ export const FriendsView = {
                 `;
             } catch (error) {
                 resultDiv.innerHTML = `<p style="color:red; font-size:0.8rem;">${i18n.t('ai.error')}</p>`;
-                if (window.aiCompanion) window.aiCompanion.say("I got confused.", "error");
+                if(window.aiCompanion) window.aiCompanion.say("I got confused.", "error");
                 setTimeout(() => resultDiv.remove(), 2000);
             }
         };

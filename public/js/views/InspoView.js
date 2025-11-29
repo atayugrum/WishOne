@@ -4,9 +4,9 @@ import { apiCall } from '../config/api.js';
 import { premiumModal } from '../components/PremiumModal.js';
 import { FEATURES } from '../config/limits.js';
 import { i18n } from '../services/LocalizationService.js';
-import { aiService } from '../services/AIService.js'; // Import AI
+import { aiService } from '../services/AIService.js'; 
 
-let activeBoard = null;
+let activeBoard = null; 
 
 export const InspoView = {
     render: async () => {
@@ -18,7 +18,7 @@ export const InspoView = {
         }
 
         const boards = await firestoreService.getBoards(user.uid);
-
+        
         window.openBoard = (id, title) => {
             activeBoard = { id, title };
             const app = document.getElementById('app');
@@ -26,13 +26,10 @@ export const InspoView = {
         };
 
         window.createBoardPrompt = async () => {
-            const title = prompt(i18n.t('inspo.create'));
-            if (title) {
+            const title = prompt(i18n.t('inspo.create')); 
+            if(title) {
                 await firestoreService.createBoard(user.uid, title, null);
-
-                // AI Reaction: Creative mood
                 aiService.triggerReaction('create_board', { title: title });
-
                 const app = document.getElementById('app');
                 InspoView.render().then(html => app.innerHTML = html);
             }
@@ -47,7 +44,7 @@ export const InspoView = {
 
         if (boards.length === 0) {
             setTimeout(() => {
-                if (window.aiCompanion) window.aiCompanion.say("This is where your vision begins.", "presenting");
+                if(window.aiCompanion) window.aiCompanion.say("Start your first moodboard here.", "presenting");
             }, 500);
 
             return `
@@ -101,14 +98,14 @@ export const InspoView = {
             const newTitle = document.getElementById('board-title-input').value;
             const newCover = document.getElementById('board-cover-input').value;
             await firestoreService.updateBoard(board.id, { title: newTitle, coverUrl: newCover });
-            activeBoard.title = newTitle;
+            activeBoard.title = newTitle; 
             document.getElementById('board-settings-modal').classList.remove('active');
             const app = document.getElementById('app');
             InspoView.render().then(html => app.innerHTML = html);
         };
 
         window.handleDeleteBoard = async () => {
-            if (confirm(i18n.t('common.confirm'))) {
+            if(confirm(i18n.t('common.confirm'))) {
                 await firestoreService.deleteBoard(board.id);
                 window.backToBoards();
             }
@@ -120,7 +117,7 @@ export const InspoView = {
             const url = prompt(i18n.t('inspo.paste_url'));
             if (url) {
                 await firestoreService.addPin(board.id, url);
-                if (window.aiCompanion) window.aiCompanion.say("Nice pin!", "magic", 2000);
+                if(window.aiCompanion) window.aiCompanion.say("Nice pin!", "magic");
                 const app = document.getElementById('app');
                 InspoView.render().then(html => app.innerHTML = html);
             }
@@ -129,7 +126,7 @@ export const InspoView = {
         window.addPinFromWishlist = async (imgUrl) => {
             await firestoreService.addPin(board.id, imgUrl);
             document.getElementById('add-pin-modal').classList.remove('active');
-            if (window.aiCompanion) window.aiCompanion.say("Added from wishlist!", "magic", 2000);
+            if(window.aiCompanion) window.aiCompanion.say("Added from wishlist!", "magic");
             const app = document.getElementById('app');
             InspoView.render().then(html => app.innerHTML = html);
         };
@@ -137,17 +134,16 @@ export const InspoView = {
         window.handleAiVibeCheck = async () => {
             const container = document.getElementById('ai-suggestions-container');
             if (!authService.canUseFeature(FEATURES.MAGIC_ADD)) { premiumModal.open(); return; }
-
+            
             container.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
             container.style.display = 'block';
-
-            if (window.aiCompanion) window.aiCompanion.say("Let me feel the vibe...", "thinking");
+            
+            if(window.aiCompanion) window.aiCompanion.say("Feeling the vibe...", "thinking");
 
             try {
                 const data = await apiCall('/api/ai/moodboard', 'POST', { title: board.title, existingPins: pins });
                 if (data.suggestions) {
-                    if (window.aiCompanion) window.aiCompanion.say("I have some ideas!", "presenting");
-
+                    if(window.aiCompanion) window.aiCompanion.say("Try these ideas!", "presenting");
                     container.innerHTML = `
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                             <strong>${i18n.t('ai.suggestion')}</strong>
@@ -158,9 +154,9 @@ export const InspoView = {
                         </div>
                     `;
                 }
-            } catch (e) {
+            } catch (e) { 
                 container.innerHTML = `<p style="color:red">${i18n.t('ai.error')}</p>`;
-                if (window.aiCompanion) window.aiCompanion.say("I'm drawing a blank.", "error");
+                if(window.aiCompanion) window.aiCompanion.say("I need more inspiration first.", "error");
             }
         };
 

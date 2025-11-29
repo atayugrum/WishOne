@@ -4,7 +4,7 @@ import { CATEGORIES } from '../config/categories.js';
 import { FEATURES } from '../config/limits.js';
 import { premiumModal } from './PremiumModal.js';
 import { i18n } from '../services/LocalizationService.js';
-import { aiService } from '../services/AIService.js'; // Import AI
+import { aiService } from '../services/AIService.js';
 
 export class AddItemModal {
     constructor(onItemSaved) {
@@ -57,41 +57,49 @@ export class AddItemModal {
                     
                     <div class="form-group">
                         <label>${i18n.t('modal.occasion')}</label>
-                        <select name="occasion" id="input-occasion">
+                        <select name="occasion" id="input-occasion" onchange="window.handleOccasionChange(this)">
                             <option value="">None</option>
                             <option value="Birthday">🎂 Birthday</option>
                             <option value="New Year">🎄 New Year</option>
                             <option value="Anniversary">💖 Anniversary</option>
-                            <option value="Just Because">✨ Just Because</option>
+                            <option value="Custom">✏️ Custom...</option>
                         </select>
+                        <input type="text" id="input-custom-occasion" placeholder="${i18n.t('modal.occasion_custom')}" style="display:none; margin-top:8px;">
                     </div>
 
                     <div class="form-group">
                         <label>${i18n.t('modal.privacy')}</label>
                         <select name="visibility" id="input-visibility">
-                            <option value="default">Default (Profile Setting)</option>
+                            <option value="default">Default</option>
                             <option value="public">Public</option>
                             <option value="friends">Friends Only</option>
-                            <option value="private">Private (Only Me)</option>
+                            <option value="private">Private</option>
                         </select>
                     </div>
 
                     <div class="form-group"><label>${i18n.t('modal.category')}</label><div class="category-grid">${categoryGridHtml}</div><input type="hidden" name="category" id="hidden-category" required></div>
-                    
                     <div class="form-group" id="custom-cat-container" style="display:none;">
                         <label>${i18n.t('modal.customCategory')}</label>
                         <input type="text" id="input-custom-cat" placeholder="My Category Name">
                     </div>
 
-                    <div class="form-group" id="subcategory-container" style="display:none;"><label>Subcategory</label><div class="subcategory-scroll" id="subcategory-list"></div><input type="hidden" name="subcategory" id="hidden-subcategory"></div>
-                    
                     <div class="form-group">
                         <label>${i18n.t('modal.priority')}</label>
                         <div class="priority-segmented-control"><label><input type="radio" name="priority" value="Low"><span>Low</span></label><label><input type="radio" name="priority" value="Medium" checked><span>Med</span></label><label><input type="radio" name="priority" value="High"><span>High</span></label></div>
                     </div>
                     
                     <div class="form-group"><label>Target Date</label><input type="date" name="targetDate" id="input-date" style="width: 100%;"></div>
-                    <div class="form-group"><label>${i18n.t('modal.image')}</label><input type="url" id="img-input" name="imageUrl" placeholder="https://..." ><div id="img-preview" style="width: 100%; height: 150px; margin-top: 10px; border-radius: 12px; background: #f0f0f0; background-size: cover; background-position: center; display: none; transition: background-image 0.3s;"></div></div>
+                    
+                    <div class="form-group">
+                        <label>${i18n.t('modal.image')}</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="url" id="img-input" name="imageUrl" placeholder="https://..." style="flex:1;">
+                            <label class="btn-primary" style="display:flex; align-items:center; cursor:pointer; font-size:0.8rem; padding:8px 12px;">
+                                📷 <input type="file" id="img-upload" accept="image/*" style="display:none;" onchange="window.handleImageUpload(this)">
+                            </label>
+                        </div>
+                        <div id="img-preview" style="width: 100%; height: 150px; margin-top: 10px; border-radius: 12px; background: #f0f0f0; background-size: cover; background-position: center; display: none; transition: background-image 0.3s;"></div>
+                    </div>
                     
                     <div class="modal-actions">
                         <button type="button" class="btn-text close-trigger">${i18n.t('modal.cancel')}</button>
@@ -112,43 +120,58 @@ export class AddItemModal {
         const magicContainer = this.overlay.querySelector('#magic-url-container');
         const btnFetchMagic = this.overlay.querySelector('#btn-fetch-magic');
         const magicInput = this.overlay.querySelector('#magic-url-input');
-        const magicError = this.overlay.querySelector('#magic-error');
         const customCatContainer = this.overlay.querySelector('#custom-cat-container');
 
-        btnMagicAdd.addEventListener('click', () => {
-            magicContainer.style.display = magicContainer.style.display === 'none' ? 'block' : 'none';
-            if (magicContainer.style.display === 'block') magicInput.focus();
-        });
+        // Toggle Magic Container
+        btnMagicAdd.onclick = () => {
+            const isHidden = magicContainer.style.display === 'none';
+            magicContainer.style.display = isHidden ? 'block' : 'none';
+            if(isHidden) magicInput.focus();
+        };
 
+        // File Upload Handler (Base64)
+        window.handleImageUpload = (input) => {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    imgInput.value = e.target.result; // Set data URI as URL
+                    imgPreview.style.backgroundImage = `url('${e.target.result}')`;
+                    imgPreview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        // Custom Occasion Handler
+        window.handleOccasionChange = (select) => {
+            const customInput = document.getElementById('input-custom-occasion');
+            customInput.style.display = select.value === 'Custom' ? 'block' : 'none';
+        };
+
+        // Magic Fetch
         btnFetchMagic.addEventListener('click', async () => {
             if (!authService.canUseFeature(FEATURES.MAGIC_ADD)) { premiumModal.open(); return; }
             const url = magicInput.value.trim();
             if (!url) return;
 
-            // Trigger AI "Thinking" state
-            if (window.aiCompanion) window.aiCompanion.setState('thinking');
-
+            if(window.aiCompanion) window.aiCompanion.setState('thinking');
             try {
                 btnFetchMagic.innerHTML = `...`; btnFetchMagic.disabled = true;
                 const { apiCall } = await import('../config/api.js');
                 const metaData = await apiCall('/api/product/metadata', 'POST', { url });
-                if (metaData.error) throw new Error(metaData.error);
-
+                
                 if (metaData.title) this.overlay.querySelector('#input-title').value = metaData.title;
                 if (metaData.imageUrl) { imgInput.value = metaData.imageUrl; imgInput.dispatchEvent(new Event('input')); }
                 if (metaData.price !== null) this.overlay.querySelector('#input-price').value = metaData.price;
                 if (metaData.currency) this.overlay.querySelector('#input-currency').value = metaData.currency;
-
+                
                 if (metaData.category && window.selectCategory) window.selectCategory(metaData.category);
-
+                
                 magicContainer.style.display = 'none';
-                // Trigger AI "Success/Magic" state
-                if (window.aiCompanion) window.aiCompanion.say("Found it!", "magic", 2000);
-
+                if(window.aiCompanion) window.aiCompanion.say("Found it!", "magic", 2000);
             } catch (error) {
-                magicError.style.display = 'block';
-                magicError.textContent = "Could not auto-fetch. Please enter details.";
-                if (window.aiCompanion) window.aiCompanion.say("I couldn't read that link.", "error");
+                if(window.aiCompanion) window.aiCompanion.say("I couldn't read that link.", "error");
             } finally {
                 btnFetchMagic.textContent = i18n.t('modal.fetch'); btnFetchMagic.disabled = false;
             }
@@ -165,17 +188,12 @@ export class AddItemModal {
         });
 
         window.selectCategory = (key) => {
-            const pills = this.overlay.querySelectorAll('.cat-pill');
-            pills.forEach(p => p.classList.remove('selected'));
-            const selected = this.overlay.querySelector(`.cat-pill[data-cat="${key}"]`);
-            if (selected) selected.classList.add('selected');
-            this.overlay.querySelector('#hidden-category').value = key;
-
-            if (key === 'Custom') {
-                customCatContainer.style.display = 'block';
-            } else {
-                customCatContainer.style.display = 'none';
-            }
+             const pills = this.overlay.querySelectorAll('.cat-pill');
+             pills.forEach(p => p.classList.remove('selected'));
+             const selected = this.overlay.querySelector(`.cat-pill[data-cat="${key}"]`);
+             if (selected) selected.classList.add('selected');
+             this.overlay.querySelector('#hidden-category').value = key;
+             customCatContainer.style.display = key === 'Custom' ? 'block' : 'none';
         };
 
         form.addEventListener('submit', async (e) => {
@@ -185,10 +203,14 @@ export class AddItemModal {
 
             const formData = new FormData(form);
             let category = formData.get('category');
-
             if (category === 'Custom') {
                 const customName = document.getElementById('input-custom-cat').value.trim();
-                if (customName) category = customName;
+                if (customName) category = customName; 
+            }
+
+            let occasion = formData.get('occasion');
+            if (occasion === 'Custom') {
+                occasion = document.getElementById('input-custom-occasion').value.trim();
             }
 
             const itemData = {
@@ -198,7 +220,7 @@ export class AddItemModal {
                 category: category,
                 subcategory: formData.get('subcategory') || null,
                 priority: formData.get('priority'),
-                occasion: formData.get('occasion') || null,
+                occasion: occasion || null,
                 visibility: formData.get('visibility'),
                 imageUrl: formData.get('imageUrl'),
                 targetDate: formData.get('targetDate') || null,
@@ -211,7 +233,6 @@ export class AddItemModal {
                     await firestoreService.updateItem(this.editingId, itemData);
                 } else {
                     await firestoreService.addItem(itemData);
-                    // AI Reaction for new item
                     aiService.triggerReaction('add_wish', itemData);
                 }
                 this.close();
@@ -232,7 +253,7 @@ export class AddItemModal {
     open(itemToEdit = null) {
         this.overlay.style.display = 'flex';
         requestAnimationFrame(() => this.overlay.classList.add('active'));
-
+        
         const form = this.overlay.querySelector('#add-item-form');
         form.reset();
         this.editingId = null;
@@ -240,6 +261,7 @@ export class AddItemModal {
         this.overlay.querySelector('#btn-submit-wish').textContent = i18n.t('modal.save');
         this.overlay.querySelector('#img-preview').style.display = 'none';
         this.overlay.querySelector('#custom-cat-container').style.display = 'none';
+        document.getElementById('input-custom-occasion').style.display = 'none';
 
         if (itemToEdit) {
             this.editingId = itemToEdit.id;
@@ -248,15 +270,28 @@ export class AddItemModal {
             this.overlay.querySelector('#input-price').value = itemToEdit.price;
             this.overlay.querySelector('#input-currency').value = itemToEdit.currency;
             this.overlay.querySelector('#img-input').value = itemToEdit.imageUrl;
+            
+            if (itemToEdit.occasion) {
+                const occSelect = this.overlay.querySelector('#input-occasion');
+                // Check if occasion is standard
+                const standard = Array.from(occSelect.options).some(o => o.value === itemToEdit.occasion);
+                if (standard) {
+                    occSelect.value = itemToEdit.occasion;
+                } else {
+                    occSelect.value = 'Custom';
+                    const custInput = document.getElementById('input-custom-occasion');
+                    custInput.style.display = 'block';
+                    custInput.value = itemToEdit.occasion;
+                }
+            }
 
-            if (itemToEdit.occasion) this.overlay.querySelector('#input-occasion').value = itemToEdit.occasion;
             if (itemToEdit.visibility) this.overlay.querySelector('#input-visibility').value = itemToEdit.visibility;
             if (itemToEdit.targetDate) this.overlay.querySelector('#input-date').value = itemToEdit.targetDate;
             if (itemToEdit.imageUrl) {
-                this.overlay.querySelector('#img-preview').style.display = 'block';
-                this.overlay.querySelector('#img-preview').style.backgroundImage = `url('${itemToEdit.imageUrl}')`;
+                 this.overlay.querySelector('#img-preview').style.display = 'block';
+                 this.overlay.querySelector('#img-preview').style.backgroundImage = `url('${itemToEdit.imageUrl}')`;
             }
-
+            
             if (itemToEdit.category) {
                 if (CATEGORIES[itemToEdit.category]) {
                     window.selectCategory(itemToEdit.category);

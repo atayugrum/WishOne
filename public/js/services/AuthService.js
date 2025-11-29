@@ -15,6 +15,7 @@ export class AuthService {
     constructor() {
         this.currentUser = null;
         this.userProfile = null;
+        this.onAuthCallback = null;
     }
 
     async login() {
@@ -41,12 +42,10 @@ export class AuthService {
         try {
             const result = await createUserWithEmailAndPassword(auth, email, password);
             const user = result.user;
-
             await updateProfile(user, {
                 displayName: fullName,
                 photoURL: `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName)}&background=random`
             });
-
             return user;
         } catch (error) {
             console.error("Registration failed:", error);
@@ -58,29 +57,39 @@ export class AuthService {
         await signOut(auth);
         this.currentUser = null;
         this.userProfile = null;
-        localStorage.clear();
+        localStorage.clear(); 
     }
 
-    // Task 1: Delete Account Logic
     async deleteUserAccount() {
         if (!this.currentUser) return;
-
         try {
-            // Firestore cleanup handled by FirestoreService separately or here
-            // Ideally, delete items first, then user doc, then Auth
-            // For simplicity in V3, we rely on a service method call before this.
-
             await deleteUser(this.currentUser);
             this.currentUser = null;
             this.userProfile = null;
             localStorage.clear();
         } catch (error) {
             console.error("Delete Account failed:", error);
-            throw error; // Likely requires re-auth
+            throw error;
         }
     }
 
+    // New Method for Onboarding
+    async completeProfile(data) {
+        if (!this.currentUser) throw new Error("No user");
+        const userRef = doc(db, "users", this.currentUser.uid);
+        await updateDoc(userRef, {
+            username: data.username,
+            birthday: data.birthday,
+            isProfileComplete: true
+        });
+        // Update local state
+        this.userProfile.username = data.username;
+        this.userProfile.birthday = data.birthday;
+        this.userProfile.isProfileComplete = true;
+    }
+
     init(callback) {
+        this.onAuthCallback = callback;
         onAuthStateChanged(auth, async (user) => {
             this.currentUser = user;
 
@@ -92,23 +101,17 @@ export class AuthService {
                     this.userProfile = snapshot.data();
                 } else {
                     console.log("Creating new user profile...");
-                    const baseUsername = user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '');
                     const displayName = user.displayName || 'User';
-
                     const newProfile = {
                         uid: user.uid,
                         email: user.email,
                         displayName: displayName,
                         photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}`,
-                        username: baseUsername,
-                        firstName: displayName.split(' ')[0],
-                        lastName: displayName.split(' ').slice(1).join(' '),
                         plan: 'free',
                         friends: [],
-                        isPrivate: false, // Default visibility
-                        phoneNumber: null,
-                        dateOfBirth: null,
-                        createdAt: new Date()
+                        isPrivate: false,
+                        createdAt: new Date(),
+                        isProfileComplete: false // New Flag
                     };
                     await setDoc(userRef, newProfile);
                     this.userProfile = newProfile;
@@ -117,7 +120,7 @@ export class AuthService {
                 this.userProfile = null;
             }
 
-            callback(user);
+            callback(user, this.userProfile);
         });
     }
 
@@ -125,6 +128,7 @@ export class AuthService {
         return this.userProfile?.plan === 'premium';
     }
 
+    // ... (keep upgradeToPremium, trackFeatureUsage, etc.)
     async upgradeToPremium() {
         if (!this.currentUser) return;
         const userRef = doc(db, "users", this.currentUser.uid);

@@ -1,186 +1,201 @@
-import { firestoreService } from '../services/FirestoreService.js';
 import { authService } from '../services/AuthService.js';
+import { firestoreService } from '../services/FirestoreService.js';
 import { apiCall } from '../config/api.js';
-import { FEATURES } from '../config/limits.js';
 import { premiumModal } from '../components/PremiumModal.js';
+import { FEATURES } from '../config/limits.js';
 import { i18n } from '../services/LocalizationService.js';
-import { aiService } from '../services/AIService.js'; // Import AI
+import { aiService } from '../services/AIService.js'; 
 
-export const ComboView = {
-    async render() {
+let activeBoard = null; 
+
+export const InspoView = {
+    render: async () => {
         const user = authService.currentUser;
-        if (!user) return `<div class="empty-state"><h2>Login Required</h2></div>`;
+        if (!user) return `<div class="empty-state">Login to dream.</div>`;
 
-        const closetItems = await firestoreService.getCloset(user.uid);
-        const savedCombos = await firestoreService.getCombos(user.uid);
+        if (activeBoard) {
+            return await InspoView.renderBoardDetail(activeBoard);
+        }
 
-        const closetGridHtml = closetItems.length > 0
-            ? `<div class="closet-grid-mini">${closetItems.map(item => `<div class="closet-item-mini" draggable="true" data-id="${item.id}" data-img="${item.imageUrl || 'https://placehold.co/100x100'}"><img src="${item.imageUrl || 'https://placehold.co/100x100'}" alt="${item.title}"></div>`).join('')}</div>`
-            : `<div style="padding:16px; text-align:center; color:var(--text-secondary); font-size:0.9rem; border:1px dashed rgba(0,0,0,0.1); border-radius:12px;">${i18n.t('combos.empty_closet')}</div>`;
+        const boards = await firestoreService.getBoards(user.uid);
+        
+        window.openBoard = (id, title) => {
+            activeBoard = { id, title };
+            const app = document.getElementById('app');
+            InspoView.render().then(html => app.innerHTML = html);
+        };
+
+        window.createBoardPrompt = async () => {
+            const title = prompt(i18n.t('inspo.create')); 
+            if(title) {
+                await firestoreService.createBoard(user.uid, title, null);
+                aiService.triggerReaction('create_board', { title: title });
+                const app = document.getElementById('app');
+                InspoView.render().then(html => app.innerHTML = html);
+            }
+        };
+
+        const createCard = `
+            <div class="glass-panel board-card create-card" onclick="window.createBoardPrompt()">
+                <div class="board-cover dashed-cover">+</div>
+                <div class="board-info"><h3>${i18n.t('inspo.create')}</h3></div>
+            </div>
+        `;
+
+        if (boards.length === 0) {
+            setTimeout(() => {
+                if(window.aiCompanion) window.aiCompanion.say("Start your first moodboard here.", "presenting");
+            }, 500);
+
+            return `
+                <div class="view-header">
+                    <h1>${i18n.t('inspo.title')}</h1>
+                    <p>${i18n.t('inspo.subtitle')}</p>
+                </div>
+                <div class="glass-panel empty-state-card">
+                    <span class="empty-icon">🎨</span>
+                    <h3 class="empty-title">${i18n.t('inspo.empty')}</h3>
+                    <p class="empty-text">${i18n.t('inspo.empty_desc')}</p>
+                    <button class="btn-primary" onclick="window.createBoardPrompt()">${i18n.t('inspo.create_btn')}</button>
+                </div>
+            `;
+        }
+
+        const gridContent = boards.map(board => `
+            <div class="glass-panel board-card" onclick="window.openBoard('${board.id}', '${board.title}')">
+                <div class="board-cover" style="background-image: url('${board.coverUrl}')"></div>
+                <div class="board-info"><h3>${board.title}</h3></div>
+            </div>
+        `).join('');
 
         return `
-            <div class="view-container">
-                <div class="view-header">
-                    <h1>${i18n.t('combos.title')}</h1>
-                    <div class="header-actions">
-                        <button id="btn-ai-suggest" class="btn-magic" ${closetItems.length === 0 ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}>✨ AI</button>
-                        <button id="btn-save-combo" class="btn-primary">${i18n.t('combos.save')}</button>
-                    </div>
-                </div>
-                
-                <div id="canvas-controls" class="glass-panel" style="display:none; position:fixed; bottom:20px; left:50%; transform:translateX(-50%); z-index:100; padding:8px 16px; align-items:center; gap:12px;">
-                    <span style="font-size:0.8rem; font-weight:600;">${i18n.t('combos.selected_item')}</span>
-                    <button class="btn-text" onclick="window.resizeItem(10)">+</button>
-                    <button class="btn-text" onclick="window.resizeItem(-10)">-</button>
-                    <button class="btn-text" onclick="window.deleteActiveItem()" style="color:red;">${i18n.t('combos.trash')}</button>
-                </div>
-
-                <div class="combo-layout">
-                    <div class="combo-canvas" id="combo-canvas">
-                        <div class="canvas-placeholder"><span style="font-size:2rem;">👕</span><br>${i18n.t('combos.drag_text')}</div>
-                    </div>
-                    <div class="combo-sidebar">
-                        <div class="sidebar-section"><h3>${i18n.t('combos.closet_section')}</h3>${closetGridHtml}</div>
-                        <div class="sidebar-section" style="margin-top: 32px;">
-                            <h3>${i18n.t('combos.saved_section')}</h3>
-                            <div class="saved-combos-list">
-                                ${savedCombos.length > 0 ? savedCombos.map(combo => `<div class="saved-combo-card glass-panel" style="display:flex; justify-content:space-between;"><span onclick='window.loadCombo(${JSON.stringify(combo)})' style="flex:1;">${combo.title}</span><button class="btn-text" onclick="window.deleteCombo('${combo.id}')" style="color:red; font-size:1.2rem;">&times;</button></div>`).join('') : '<p style="font-size:0.8rem; color:var(--text-secondary);">No saved combos.</p>'}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="view-header">
+                <h1>${i18n.t('inspo.title')}</h1>
+                <p>${i18n.t('inspo.subtitle')}</p>
             </div>
-            <div id="ai-modal" class="modal-overlay">
-                <div class="modal-content" style="max-width: 600px;">
-                    <div class="modal-header"><h2>${i18n.t('ai.suggestion')}</h2><button class="close-btn" id="close-ai-modal">&times;</button></div>
-                    <div id="ai-results" class="ai-results-container"></div>
-                </div>
-            </div>
+            <div class="boards-grid">${createCard}${gridContent}</div>
         `;
     },
 
-    afterRender() {
-        const canvas = document.getElementById('combo-canvas');
-        if (!canvas) return;
+    renderBoardDetail: async (board) => {
+        const [pins, wishlist] = await Promise.all([
+            firestoreService.getPins(board.id),
+            firestoreService.getWishlist(authService.currentUser.uid)
+        ]);
 
-        let activeItem = null;
-
-        const setActiveItem = (img) => {
-            if (activeItem) activeItem.style.border = 'none';
-            activeItem = img;
-            if (activeItem) {
-                activeItem.style.border = '2px solid var(--accent-color)';
-                document.getElementById('canvas-controls').style.display = 'flex';
-            } else {
-                document.getElementById('canvas-controls').style.display = 'none';
-            }
-        };
-
-        window.resizeItem = (delta) => {
-            if (activeItem) {
-                const currentWidth = parseInt(activeItem.style.width || '100');
-                activeItem.style.width = `${Math.max(50, currentWidth + delta)}px`;
-            }
-        };
-
-        window.deleteActiveItem = () => {
-            if (activeItem) { activeItem.remove(); setActiveItem(null); }
-        };
-
-        window.deleteCombo = async (id) => {
-            if (confirm(i18n.t('common.confirm'))) {
-                await firestoreService.deleteCombo(id);
-                const app = document.getElementById('app');
-                ComboView.render().then(html => { app.innerHTML = html; ComboView.afterRender(); });
-            }
-        };
-
-        const draggables = document.querySelectorAll('.closet-item-mini');
-        draggables.forEach(d => d.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', JSON.stringify({ id: d.dataset.id, img: d.dataset.img }))));
-
-        canvas.addEventListener('dragover', (e) => { e.preventDefault(); canvas.classList.add('drag-over'); });
-        canvas.addEventListener('dragleave', () => canvas.classList.remove('drag-over'));
-        canvas.addEventListener('drop', (e) => {
-            e.preventDefault(); canvas.classList.remove('drag-over');
-            const placeholder = canvas.querySelector('.canvas-placeholder');
-            if (placeholder) placeholder.remove();
-            try {
-                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                this.addItemToCanvas(data.id, data.img, e.offsetX - 50, e.offsetY - 50);
-            } catch (err) { console.error(err); }
-        });
-
-        canvas.addEventListener('click', (e) => { if (e.target === canvas) setActiveItem(null); });
-
-        this.addItemToCanvas = (id, src, left, top, width = '100px') => {
-            const img = document.createElement('img');
-            img.src = src; img.className = 'canvas-item'; img.dataset.id = id;
-            img.style.position = 'absolute'; img.style.left = `${left}px`; img.style.top = `${top}px`; img.style.width = width;
-            img.addEventListener('mousedown', (e) => { e.stopPropagation(); setActiveItem(img); this.dragElement(e, img); });
-            canvas.appendChild(img);
-        };
-
-        document.getElementById('btn-save-combo').addEventListener('click', async () => {
-            const title = prompt(i18n.t('combos.save'));
-            if (!title) return;
-            const items = Array.from(canvas.querySelectorAll('.canvas-item')).map(img => ({ itemId: img.dataset.id, src: img.src, left: img.style.left, top: img.style.top, width: img.style.width }));
-            if (items.length === 0) return alert("Empty");
-
-            // AI Reaction: Stylish mood
-            aiService.triggerReaction('create_combo', { title: title });
-
-            await firestoreService.saveCombo(authService.currentUser.uid, { title, items });
-            alert(i18n.t('common.success'));
+        window.backToBoards = () => {
+            activeBoard = null;
             const app = document.getElementById('app');
-            ComboView.render().then(html => { app.innerHTML = html; ComboView.afterRender(); });
-        });
-
-        window.loadCombo = (combo) => {
-            canvas.innerHTML = '';
-            combo.items.forEach(item => this.addItemToCanvas(item.itemId, item.src, parseFloat(item.left), parseFloat(item.top), item.width));
+            InspoView.render().then(html => app.innerHTML = html);
         };
 
-        const aiBtn = document.getElementById('btn-ai-suggest');
-        const aiModal = document.getElementById('ai-modal');
-        const aiResults = document.getElementById('ai-results');
-        document.getElementById('close-ai-modal').addEventListener('click', () => { aiModal.classList.remove('active'); setTimeout(() => aiModal.style.display = 'none', 300); });
+        window.openBoardSettings = () => {
+            document.getElementById('board-settings-modal').classList.add('active');
+        };
 
-        aiBtn.addEventListener('click', async () => {
-            if (!authService.canUseFeature(FEATURES.AI_COMBO)) { premiumModal.open(); return; }
-            aiModal.style.display = 'flex'; requestAnimationFrame(() => aiModal.classList.add('active'));
-            aiResults.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
+        window.handleUpdateBoard = async (e) => {
+            e.preventDefault();
+            const newTitle = document.getElementById('board-title-input').value;
+            const newCover = document.getElementById('board-cover-input').value;
+            await firestoreService.updateBoard(board.id, { title: newTitle, coverUrl: newCover });
+            activeBoard.title = newTitle; 
+            document.getElementById('board-settings-modal').classList.remove('active');
+            const app = document.getElementById('app');
+            InspoView.render().then(html => app.innerHTML = html);
+        };
 
-            if (window.aiCompanion) window.aiCompanion.say("Let's style you up!", "dancing");
+        window.handleDeleteBoard = async () => {
+            if(confirm(i18n.t('common.confirm'))) {
+                await firestoreService.deleteBoard(board.id);
+                window.backToBoards();
+            }
+        };
+
+        window.openAddPin = () => { document.getElementById('add-pin-modal').classList.add('active'); };
+
+        window.addPinFromUrl = async () => {
+            const url = prompt(i18n.t('inspo.paste_url'));
+            if (url) {
+                await firestoreService.addPin(board.id, url);
+                if(window.aiCompanion) window.aiCompanion.say("Nice pin!", "magic");
+                const app = document.getElementById('app');
+                InspoView.render().then(html => app.innerHTML = html);
+            }
+        };
+
+        window.addPinFromWishlist = async (imgUrl) => {
+            await firestoreService.addPin(board.id, imgUrl);
+            document.getElementById('add-pin-modal').classList.remove('active');
+            if(window.aiCompanion) window.aiCompanion.say("Added from wishlist!", "magic");
+            const app = document.getElementById('app');
+            InspoView.render().then(html => app.innerHTML = html);
+        };
+
+        window.handleAiVibeCheck = async () => {
+            const container = document.getElementById('ai-suggestions-container');
+            if (!authService.canUseFeature(FEATURES.MAGIC_ADD)) { premiumModal.open(); return; }
+            
+            container.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
+            container.style.display = 'block';
+            
+            if(window.aiCompanion) window.aiCompanion.say("Feeling the vibe...", "thinking");
 
             try {
-                const closetItems = await firestoreService.getCloset(authService.currentUser.uid);
-                const data = await apiCall('/api/ai/combo-suggestions', 'POST', { closetItems });
-                authService.trackFeatureUsage(FEATURES.AI_COMBO);
-
-                if (data.combos) {
-                    if (window.aiCompanion) window.aiCompanion.say("Try these looks!", "presenting");
-
-                    aiResults.innerHTML = data.combos.map((combo, i) => `<div class="glass-panel" onclick="window.applyAiCombo(${i})" style="margin-bottom:10px; cursor:pointer;"><strong>${combo.name}</strong><br><small>${combo.description}</small></div>`).join('');
-                    window.applyAiCombo = (idx) => {
-                        const c = data.combos[idx];
-                        canvas.innerHTML = '';
-                        c.itemIds.forEach((id, k) => { const it = closetItems.find(x => x.id === id); if (it) this.addItemToCanvas(id, it.imageUrl, 50 + (k * 120), 50); });
-                        document.getElementById('close-ai-modal').click();
-                    };
+                const data = await apiCall('/api/ai/moodboard', 'POST', { title: board.title, existingPins: pins });
+                if (data.suggestions) {
+                    if(window.aiCompanion) window.aiCompanion.say("Try these ideas!", "presenting");
+                    container.innerHTML = `
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <strong>${i18n.t('ai.suggestion')}</strong>
+                            <button class="btn-text" onclick="document.getElementById('ai-suggestions-container').style.display='none'">&times;</button>
+                        </div>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            ${data.suggestions.map(s => `<div class="glass-panel" style="padding:12px; flex:1; min-width:150px; background:rgba(255,255,255,0.9);"><div style="font-weight:600;">${s.name}</div><div style="font-size:0.8rem; color:var(--text-secondary); margin-top:4px;">${s.why}</div></div>`).join('')}
+                        </div>
+                    `;
                 }
-            } catch (e) {
-                aiResults.innerHTML = i18n.t('ai.error');
-                if (window.aiCompanion) window.aiCompanion.say("I need more clothes to work with.", "error");
+            } catch (e) { 
+                container.innerHTML = `<p style="color:red">${i18n.t('ai.error')}</p>`;
+                if(window.aiCompanion) window.aiCompanion.say("I need more inspiration first.", "error");
             }
-        });
-    },
+        };
 
-    dragElement(e, elmnt) {
-        e.preventDefault();
-        let pos1 = 0, pos2 = 0, pos3 = e.clientX, pos4 = e.clientY;
-        document.onmouseup = closeDragElement;
-        document.onmousemove = elementDrag;
-        function elementDrag(e) { e.preventDefault(); pos1 = pos3 - e.clientX; pos2 = pos4 - e.clientY; pos3 = e.clientX; pos4 = e.clientY; elmnt.style.top = (elmnt.offsetTop - pos2) + "px"; elmnt.style.left = (elmnt.offsetLeft - pos1) + "px"; }
-        function closeDragElement() { document.onmouseup = null; document.onmousemove = null; }
+        const pinsHtml = pins.length > 0 ? pins.map(pin => `<div class="pin-item"><img src="${pin.imageUrl}" loading="lazy"></div>`).join('') : `<div style="grid-column: 1 / -1; text-align: center; color: var(--text-tertiary); padding: 40px;">No pins yet.</div>`;
+
+        return `
+            <div class="view-header" style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap: 16px;">
+                    <button class="btn-text" onclick="window.backToBoards()" style="font-size: 1.5rem;">←</button>
+                    <div><h1>${board.title} <button onclick="window.openBoardSettings()" class="btn-text" style="font-size:1rem; opacity:0.5;">⚙️</button></h1><p>${i18n.t('inspo.visual_board')}</p></div>
+                </div>
+                <button class="btn-magic" onclick="window.handleAiVibeCheck()">${i18n.t('inspo.ai_ideas')}</button>
+            </div>
+            <div id="ai-suggestions-container" class="glass-panel" style="display:none; padding:16px; margin-bottom:24px; animation:fadeUp 0.3s;"></div>
+            <div class="masonry-grid inspo-masonry">${pinsHtml}</div>
+            <button class="fab-add" onclick="window.openAddPin()">+</button>
+
+            <div id="board-settings-modal" class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header"><h3>${i18n.t('inspo.settings')}</h3><button class="close-btn" onclick="document.getElementById('board-settings-modal').classList.remove('active')">&times;</button></div>
+                    <form onsubmit="window.handleUpdateBoard(event)">
+                        <div class="form-group"><label>Title</label><input type="text" id="board-title-input" value="${board.title}" required></div>
+                        <div class="form-group"><label>Cover URL</label><input type="url" id="board-cover-input" value="${board.coverUrl}"></div>
+                        <button type="submit" class="btn-primary" style="width:100%;">${i18n.t('modal.save')}</button>
+                    </form>
+                    <button onclick="window.handleDeleteBoard()" class="btn-text" style="color:red; width:100%; margin-top:16px;">${i18n.t('common.delete')}</button>
+                </div>
+            </div>
+
+            <div id="add-pin-modal" class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header"><h3>${i18n.t('inspo.add_pin')}</h3><button class="close-btn" onclick="document.getElementById('add-pin-modal').classList.remove('active')">&times;</button></div>
+                    <button class="btn-primary" onclick="window.addPinFromUrl()" style="width:100%; margin-bottom:16px;">${i18n.t('inspo.paste_url')}</button>
+                    <p style="margin-bottom:8px; font-weight:600; color:var(--text-secondary);">${i18n.t('inspo.from_wishlist')}</p>
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; max-height:200px; overflow-y:auto;">
+                        ${wishlist.map(item => `<div onclick="window.addPinFromWishlist('${item.imageUrl}')" style="cursor:pointer; border-radius:8px; overflow:hidden; aspect-ratio:1;"><img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;"></div>`).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 };

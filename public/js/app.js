@@ -2,6 +2,7 @@ import { Router } from './utils/Router.js';
 import { Header } from './components/Header.js';
 import { HomeView } from './views/HomeView.js';
 import { WelcomeView } from './views/WelcomeView.js';
+import { OnboardingView } from './views/OnboardingView.js'; // NEW
 import { FriendsView } from './views/FriendsView.js';
 import { FriendWishlistView } from './views/FriendWishlistView.js';
 import { PublicWishlistView } from './views/PublicWishlistView.js';
@@ -11,14 +12,13 @@ import { ComboView } from './views/ComboView.js';
 import { ProfileView } from './views/ProfileView.js';
 import { authService } from './services/AuthService.js';
 import { LogService } from './services/LogService.js';
-
-// Import AI modules
 import { AICompanion } from './components/AICompanion.js';
 import { aiService } from './services/AIService.js';
 
 const routes = {
     '/': HomeView,
     '/welcome': WelcomeView,
+    '/onboarding': OnboardingView, // NEW
     '/friends': FriendsView,
     '/friend-wishlist': FriendWishlistView,
     '/share': PublicWishlistView,
@@ -31,44 +31,39 @@ const routes = {
 
 document.addEventListener('DOMContentLoaded', () => {
     LogService.info('App Started');
-
-    // 1. Initialize Header
     const header = new Header();
     header.mount('body');
 
-    // 2. Initialize AI Companion (Global)
-    try {
-        window.aiCompanion = new AICompanion();
-    } catch (e) {
-        LogService.error('AI Companion Init Failed', { error: e.message });
-    }
+    try { window.aiCompanion = new AICompanion(); } catch (e) { console.error(e); }
 
-    // 3. Initialize Router
     const router = new Router(routes);
 
-    // 4. Auth Listener
-    authService.init((user) => {
+    authService.init((user, profile) => {
         if (user) {
+            // Check Profile Completion (Task 1.7)
+            if (profile && !profile.isProfileComplete) {
+                header.hide();
+                window.location.hash = '#/onboarding';
+                router.handleLocation();
+                return;
+            }
+
             header.updateUser(user);
             header.show();
 
-            // AI Greet (Dynamic via Gemini)
-            if (window.aiCompanion) {
+            // Only greet on Home to avoid spamming
+            if (window.location.hash === '#/' || window.location.hash === '') {
                 setTimeout(() => {
-                    // Trigger "login" action so Gemini generates a unique welcome
-                    aiService.triggerReaction('login', {
-                        name: user.displayName || 'Dreamer'
-                    });
+                    aiService.triggerReaction('login', { name: user.displayName || 'Dreamer' });
                 }, 1000);
             }
 
-            if (window.location.hash === '#/welcome') {
+            if (window.location.hash === '#/welcome' || window.location.hash === '#/onboarding') {
                 window.location.hash = '#/';
             }
             router.handleLocation();
         } else {
             header.hide();
-            // Allow public share route even if logged out
             if (!window.location.hash.startsWith('#/share')) {
                 window.location.hash = '#/welcome';
             }
@@ -76,19 +71,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // 5. Offline/Online Handling
     window.addEventListener('offline', () => {
-        window.showToast("You are offline. Changes may not save.", "📡");
+        if (window.aiCompanion) window.aiCompanion.say("Offline...", "error");
         document.body.style.filter = "grayscale(0.8)";
-        // Trigger error mood on mascot
-        if (window.aiCompanion) window.aiCompanion.say("I can't reach the cloud...", "error");
-        LogService.warn('Network Status', { status: 'offline' });
     });
-
     window.addEventListener('online', () => {
-        window.showToast("Back online!", "🟢");
+        if (window.aiCompanion) window.aiCompanion.say("Online!", "welcome");
         document.body.style.filter = "";
-        if (window.aiCompanion) window.aiCompanion.say("We are back!", "welcome");
-        LogService.info('Network Status', { status: 'online' });
     });
 });

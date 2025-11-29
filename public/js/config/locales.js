@@ -7,14 +7,31 @@ export const TRANSLATIONS = {
             closet: "Closet",
             combos: "Combos"
         },
+        welcome: {
+            slogan: "Curate your life. Manifest your dreams.",
+            by: "WishOne by AtOne",
+            about: "About WishOne",
+            about_text: "WishOne is an AI-powered social wishlist experience designed to help you visualize and achieve your goals. The AtOne Monkey is your AI companion on this journey.",
+            rights: "© 2025 AtOne Ecosystem. All rights reserved."
+        },
+        onboarding: {
+            title: "Almost There!",
+            subtitle: "Let's finish setting up your profile.",
+            username: "Pick a Username",
+            birthday: "Your Birthday",
+            complete: "Start Manifesting"
+        },
         home: {
             title: "My Wishlist",
             subtitle: "Everything you're manifesting.",
             empty: "Your wish space is empty. Start visualizing your dreams.",
-            addBtn: "Add to Wishlist",
+            addBtn: "Add Wish",
             sale_filter: "Sale Only",
             private_badge: "🔒 Private",
-            public_badge: "🌍 Public"
+            public_badge: "🌍 Public",
+            planner_locked: "Add at least 3 items to unlock the AI Planner.",
+            tutorial_title: "Welcome to WishOne!",
+            tutorial_text: "Here you can collect wishes, organize them into boards, and plan your purchases with AI."
         },
         friends: {
             title: "Friends",
@@ -36,9 +53,12 @@ export const TRANSLATIONS = {
             settings: "Board Settings",
             add_pin: "Add Pin",
             paste_url: "Paste Image URL",
+            upload_img: "Upload Image",
             from_wishlist: "From Your Wishlist",
             ai_ideas: "✨ Ideas",
-            visual_board: "Visual Board"
+            visual_board: "Visual Board",
+            edit: "Edit Board",
+            cover_url: "Cover Image URL"
         },
         closet: {
             title: "My Closet",
@@ -52,12 +72,14 @@ export const TRANSLATIONS = {
         combos: {
             title: "Combo Builder",
             save: "Save Combo",
-            drag_text: "Drag items here",
+            drag_text: "Drag items here or add new ones",
             closet_section: "Your Closet",
             saved_section: "Saved Combos",
             empty_closet: "Your closet is empty.",
             selected_item: "Selected Item",
-            trash: "Trash"
+            trash: "Trash",
+            add_image: "Add Image",
+            upload: "Upload"
         },
         modal: {
             title: "New Wish",
@@ -67,13 +89,14 @@ export const TRANSLATIONS = {
             category: "Category",
             customCategory: "Category Name",
             priority: "Priority",
-            image: "Image URL",
+            image: "Image URL or Upload",
             cancel: "Cancel",
             save: "Save",
-            magic: "✨ Magic Add",
+            magic: "✨ Magic Get",
             fetch: "Fetch",
             privacy: "Visibility",
-            occasion: "Occasion (Optional)"
+            occasion: "Occasion (Optional)",
+            occasion_custom: "Enter custom occasion..."
         },
         profile: {
             title: "My Profile",
@@ -108,7 +131,8 @@ export const TRANSLATIONS = {
             success: "Success!",
             delete: "Delete",
             edit: "Edit",
-            confirm: "Are you sure?"
+            confirm: "Are you sure?",
+            or: "OR"
         }
     },
     tr: {
@@ -119,6 +143,20 @@ export const TRANSLATIONS = {
             closet: "Dolabım",
             combos: "Kombinler"
         },
+        welcome: {
+            slogan: "Hayatını düzenle. Hayallerini gerçekleştir.",
+            by: "WishOne, AtOne tarafından sunulur",
+            about: "WishOne Hakkında",
+            about_text: "WishOne, hedeflerinizi görselleştirmenize ve bunlara ulaşmanıza yardımcı olmak için tasarlanmış yapay zeka destekli bir sosyal istek listesi deneyimidir. AtOne Maymunu, bu yolculukta AI arkadaşınızdır.",
+            rights: "© 2025 AtOne Ecosystem. Tüm hakları saklıdır."
+        },
+        onboarding: {
+            title: "Az Kaldı!",
+            subtitle: "Profilini tamamlayalım.",
+            username: "Bir Kullanıcı Adı Seç",
+            birthday: "Doğum Günün",
+            complete: "Başla"
+        },
         home: {
             title: "İstek Listem",
             subtitle: "Hayal ettiğin her şey.",
@@ -126,7 +164,10 @@ export const TRANSLATIONS = {
             addBtn: "İstek Ekle",
             sale_filter: "İndirimler",
             private_badge: "🔒 Gizli",
-            public_badge: "🌍 Herkes"
+            public_badge: "🌍 Herkes",
+            planner_locked: "AI Planlayıcıyı açmak için en az 3 ürün ekle.",
+            tutorial_title: "WishOne'a Hoşgeldin!",
+            tutorial_text: "Burada isteklerini toplayabilir, panolarda düzenleyebilir ve yapay zeka ile satın alma planı yapabilirsin."
         },
         friends: {
             title: "Arkadaşlar",
@@ -148,9 +189,12 @@ export const TRANSLATIONS = {
             settings: "Pano Ayarları",
             add_pin: "Pin Ekle",
             paste_url: "Resim Linki Yapıştır",
+            upload_img: "Resim Yükle",
             from_wishlist: "Listenden Seç",
             ai_ideas: "✨ Fikirler",
-            visual_board: "Görsel Pano"
+            visual_board: "Görsel Pano",
+            edit: "Panoyu Düzenle",
+            cover_url: "Kapak Resmi URL"
         },
         closet: {
             title: "Dolabım",
@@ -164,12 +208,14 @@ export const TRANSLATIONS = {
         combos: {
             title: "Kombin Oluşturucu",
             save: "Kombini Kaydet",
-            drag_text: "Eşyaları buraya sürükle",
+            drag_text: "Eşyaları buraya sürükle veya yenisini ekle",
             closet_section: "Dolabın",
             saved_section: "Kayıtlı Kombinler",
             empty_closet: "Dolabın boş.",
             selected_item: "Seçili Eşya",
-            trash: "Sil"
+            trash: "Sil",
+            add_image: "Resim Ekle",
+            upload: "Yükle"
         },
         modal: {
             title: "Yeni İstek",
@@ -179,13 +225,14 @@ export const TRANSLATIONS = {
             category: "Kategori",
             customCategory: "Kategori Adı",
             priority: "Öncelik",
-            image: "Resim Linki",
+            image: "Resim Linki veya Yükle",
             cancel: "İptal",
             save: "Kaydet",
             magic: "✨ Sihirli Ekle",
             fetch: "Getir",
             privacy: "Görünürlük",
-            occasion: "Özel Gün (Opsiyonel)"
+            occasion: "Özel Gün (Opsiyonel)",
+            occasion_custom: "Özel gün giriniz..."
         },
         profile: {
             title: "Profilim",
@@ -220,7 +267,8 @@ export const TRANSLATIONS = {
             success: "Başarılı!",
             delete: "Sil",
             edit: "Düzenle",
-            confirm: "Emin misin?"
+            confirm: "Emin misin?",
+            or: "VEYA"
         }
     }
 };
