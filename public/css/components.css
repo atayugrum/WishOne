@@ -61,7 +61,7 @@
     transition: transform 0.1s var(--ease-ios);
 }
 
-/* --- 3. Floating Header (FIXED) --- */
+/* --- 3. Floating Header --- */
 .floating-header {
     position: fixed;
     top: 24px;
@@ -72,6 +72,7 @@
     height: 70px;
     z-index: 1000;
     display: none;
+    /* Hidden by default, toggled by JS */
     align-items: center;
     justify-content: space-between;
     padding: 0 24px;
@@ -98,7 +99,252 @@
     transform: scale(1.05);
 }
 
-/* --- Skeleton Loading Animation --- */
+/* --- Welcome / Hero Screen (REDESIGN) --- */
+.welcome-container {
+    height: 100vh;
+    /* Use full height */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+}
+
+/* A glow behind the card for atmosphere */
+.premium-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+    z-index: 0;
+    pointer-events: none;
+}
+
+.auth-card {
+    width: 90%;
+    max-width: 440px;
+    padding: 60px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    animation: fadeUp 0.8s var(--ease-ios);
+    z-index: 1;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(40px) saturate(150%);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
+    border-radius: 32px;
+}
+
+/* Lighter Card Variant (Milestone 1) */
+.lighter-card {
+    padding: 40px 32px;
+    max-width: 380px;
+    background: rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(25px) saturate(180%);
+    border-radius: 28px;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.05);
+}
+
+/* Brand Section */
+.brand-hero {
+    margin-bottom: 40px;
+    animation: float 6s ease-in-out infinite;
+    text-align: center;
+}
+
+.brand-icon {
+    font-size: 64px;
+    display: block;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 10px 20px rgba(100, 100, 255, 0.2));
+}
+
+.hero-icon-small {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 12px;
+    object-fit: contain;
+}
+
+.compact-hero {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.hero-title {
+    font-size: 3rem;
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #1D1D1F 0%, #555 100%);
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -webkit-background-clip: text;
+}
+
+.compact-title {
+    font-size: 1.8rem;
+    margin-bottom: 4px;
+}
+
+.hero-subtitle {
+    font-size: 1.1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.hero-brand-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.compact-subtitle {
+    font-size: 0.95rem;
+    margin-top: 8px;
+    opacity: 0.8;
+}
+
+/* Auth Segmented Control */
+.auth-tabs {
+    background: rgba(0, 0, 0, 0.03);
+    padding: 6px;
+    border-radius: 16px;
+    display: flex;
+    width: 100%;
+    margin-bottom: 32px;
+}
+
+.compact-tabs {
+    margin-bottom: 20px;
+    padding: 4px;
+    border-radius: 12px;
+}
+
+.auth-tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    border-radius: 12px;
+    transition: all 0.3s var(--ease-ios);
+}
+
+.auth-tab.active {
+    background: white;
+    color: var(--text-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.social-divider {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin: 24px 0;
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+}
+
+.compact-divider {
+    margin: 16px 0;
+}
+
+.social-divider::before,
+.social-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.1);
+}
+
+.social-divider span {
+    padding: 0 12px;
+}
+
+/* Google Button Style */
+.btn-google {
+    background: white;
+    color: #1D1D1F;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.btn-google:hover {
+    background: #f8f8f8;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+@keyframes float {
+
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+
+    50% {
+        transform: translateY(-10px);
+    }
+}
+
+/* --- Header Actions --- */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 100%;
+}
+
+.icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
+/* --- User Avatar --- */
+.user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    cursor: pointer;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    transition: transform 0.2s, border-color 0.2s;
+    position: relative;
+    z-index: 1001;
+    pointer-events: auto;
+}
+
+.user-avatar:hover {
+    transform: scale(1.1);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+/* --- Skeleton Loading --- */
 .skeleton-card {
     pointer-events: none;
 }
@@ -107,12 +353,9 @@
     height: 180px;
     border-radius: 16px;
     margin-bottom: 16px;
-    animation: shimmer 1.5s infinite linear;
-    background: linear-gradient(to right,
-            rgba(255, 255, 255, 0.1) 0%,
-            rgba(255, 255, 255, 0.3) 50%,
-            rgba(255, 255, 255, 0.1) 100%);
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.1) 100%);
     background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
 }
 
 .skeleton-text {
@@ -162,7 +405,7 @@
 }
 
 .fab-add:hover {
-    transform: scale(1.1) rotate(90deg);
+    transform: scale(1.1);
 }
 
 /* --- Modal System --- */
@@ -174,7 +417,6 @@
     height: 100%;
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(8px);
-    /* Increased blur */
     z-index: 1000;
     display: none;
     align-items: center;
@@ -192,14 +434,10 @@
     max-width: 500px;
     max-height: 85vh;
     overflow-y: auto;
-    overscroll-behavior: contain;
     background: rgba(255, 255, 255, 0.95);
     padding: 40px;
-    /* More breathing room */
     border-radius: 32px;
-    /* Smoother corners */
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.15);
-    /* Softer, deeper shadow */
     transform: scale(0.95);
     transition: transform 0.3s var(--ease-ios);
     display: flex;
@@ -244,6 +482,10 @@
     position: relative;
 }
 
+.compact-group {
+    margin-bottom: 16px;
+}
+
 .form-row {
     display: flex;
     gap: 16px;
@@ -251,13 +493,12 @@
 
 label {
     display: block;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 8px;
     letter-spacing: 0.5px;
     text-transform: uppercase;
-    font-size: 0.75rem;
 }
 
 input,
@@ -266,11 +507,21 @@ select {
     padding: 14px 18px;
     border-radius: 16px;
     border: 1px solid rgba(0, 0, 0, 0.08);
-    /* Lighter border */
     background: rgba(255, 255, 255, 0.6);
     font-family: var(--font-body);
     font-size: 1rem;
     transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.compact-group input {
+    padding: 12px 12px 12px 42px;
+    font-size: 0.95rem;
+    border-radius: 12px;
+}
+
+.compact-btn {
+    padding: 12px;
+    font-size: 0.95rem;
 }
 
 input:focus,
@@ -282,7 +533,6 @@ select:focus {
     transform: translateY(-1px);
 }
 
-/* Input with Icon */
 .input-with-icon {
     position: relative;
 }
@@ -322,6 +572,11 @@ select:focus {
     color: var(--text-primary);
 }
 
+.lang-toggle:hover {
+    background: rgba(255, 255, 255, 0.8) !important;
+    transform: scale(1.05);
+}
+
 /* --- Card / Item --- */
 .card {
     display: inline-block;
@@ -337,7 +592,6 @@ select:focus {
     transition: all 0.3s var(--ease-ios);
     position: relative;
     overflow: hidden;
-    /* Ensure rounded corners clip content */
 }
 
 .card:hover {
@@ -380,17 +634,7 @@ select:focus {
     color: var(--text-secondary);
 }
 
-/* --- Gift Button --- */
-.gift-btn {
-    color: #34C759;
-}
-
-.gift-btn:hover {
-    background: #34C759;
-    color: white;
-}
-
-/* --- Card Action Button (Delete / Gift / Closet icons) --- */
+/* --- Card Action Button --- */
 .card-action-btn {
     position: absolute;
     top: 10px;
@@ -450,6 +694,16 @@ select:focus {
     color: white;
 }
 
+.gift-btn {
+    color: #34C759;
+}
+
+.gift-btn:hover {
+    background: #34C759;
+    color: white;
+}
+
+/* --- AI Companion --- */
 .ai-companion {
     position: fixed;
     bottom: 20px;
@@ -457,17 +711,12 @@ select:focus {
     z-index: 1000;
     display: flex;
     align-items: flex-end;
-    /* Align bottom so bubble sits above/beside */
     gap: 12px;
-    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     pointer-events: none;
-    /* Allow clicks to pass through unless interacting */
 }
 
-/* The Avatar Container */
 .ai-avatar-container {
     width: 80px;
-    /* Bigger size for visibility */
     height: 80px;
     display: flex;
     align-items: center;
@@ -475,7 +724,6 @@ select:focus {
     filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.15));
     transition: transform 0.2s;
     pointer-events: auto;
-    /* Allow clicking the mascot */
     cursor: pointer;
 }
 
@@ -487,47 +735,37 @@ select:focus {
     width: 100%;
     height: 100%;
     object-fit: contain;
-    will-change: transform;
     transition: transform 0.3s var(--ease-spring);
 }
 
-/* The Speech Bubble (Hidden by default) */
 .ai-message-bubble {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(12px);
     padding: 14px 20px;
     border-radius: 20px;
     border-bottom-left-radius: 4px;
-    /* Speech bubble anchor */
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
     font-size: 0.95rem;
     font-weight: 500;
     color: var(--text-primary);
     max-width: 240px;
     border: 1px solid rgba(255, 255, 255, 0.8);
-
-    /* Hide state */
     opacity: 0;
     transform: translateY(10px) scale(0.9);
     transform-origin: bottom left;
     transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-
     margin-bottom: 40px;
-    /* Push up slightly */
     pointer-events: auto;
 }
 
-/* Active State (Bubble Visible) */
 .ai-companion.active .ai-message-bubble {
     opacity: 1;
     transform: translateY(0) scale(1);
 }
 
-/* Mobile Adjustments */
 @media (max-width: 600px) {
     .ai-companion {
         bottom: 80px;
-        /* Above bottom nav/fab */
         left: 10px;
     }
 
@@ -537,7 +775,7 @@ select:focus {
     }
 }
 
-/* --- Board Dashboard Grid --- */
+/* --- Boards & Dashboard --- */
 .boards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -588,7 +826,6 @@ select:focus {
     color: var(--text-tertiary);
 }
 
-/* --- Dashboard Widget --- */
 .dashboard-widget {
     display: flex;
     justify-content: space-around;
@@ -596,7 +833,6 @@ select:focus {
     padding: 24px;
     margin-bottom: 40px;
     background: rgba(255, 255, 255, 0.5);
-    /* Lighter glass */
     border: 1px solid rgba(255, 255, 255, 0.6);
 }
 
@@ -627,19 +863,16 @@ select:focus {
     background: rgba(0, 0, 0, 0.1);
 }
 
-/* --- Owned Card Style --- */
+/* --- Card Badges & States --- */
 .card-owned {
     opacity: 0.8;
     background: rgba(255, 255, 255, 0.1);
-    /* More transparent */
 }
 
 .card-owned img {
     filter: grayscale(30%);
-    /* Slightly muted */
 }
 
-/* --- Pin Grid (Pure Visuals) --- */
 .inspo-masonry .pin-item {
     margin-bottom: 16px;
     border-radius: 16px;
@@ -659,12 +892,9 @@ select:focus {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
 }
 
-/* --- The Gifted State (Gold) --- */
 .card-gifted {
     border: 2px solid #FFD700 !important;
-    /* Gold Border */
     background: rgba(255, 215, 0, 0.15) !important;
-    /* Subtle Gold Tint */
     box-shadow: 0 10px 40px rgba(255, 215, 0, 0.2) !important;
     transform: scale(1.02);
 }
@@ -690,221 +920,18 @@ select:focus {
     content: "🎁";
 }
 
-/* --- The Locked State (Grey) --- */
 .card-locked {
     opacity: 0.5;
     filter: grayscale(100%);
     pointer-events: none;
-    /* Can't click anything */
     border: 1px dashed rgba(0, 0, 0, 0.2);
 }
 
 .card-locked .card-action-btn {
     display: none;
-    /* Hide buttons on locked cards */
 }
 
-/* --- Welcome / Hero Screen (REDESIGN) --- */
-.welcome-container {
-    height: 100vh;
-    /* Use full height */
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-}
-
-/* A glow behind the card for atmosphere */
-.premium-glow {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 600px;
-    height: 600px;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
-    z-index: 0;
-    pointer-events: none;
-}
-
-.auth-card {
-    width: 90%;
-    max-width: 440px;
-    padding: 60px 40px;
-    /* Spacious padding */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    animation: fadeUp 0.8s var(--ease-ios);
-    z-index: 1;
-    /* Above glow */
-
-    /* Stronger Glass */
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(40px) saturate(150%);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
-    border-radius: 32px;
-}
-
-/* Brand Section */
-.brand-hero {
-    margin-bottom: 40px;
-    animation: float 6s ease-in-out infinite;
-    text-align: center;
-}
-
-.brand-icon {
-    font-size: 64px;
-    display: block;
-    margin-bottom: 8px;
-    filter: drop-shadow(0 10px 20px rgba(100, 100, 255, 0.2));
-}
-
-.hero-title {
-    font-size: 3rem;
-    /* Larger */
-    margin-bottom: 8px;
-    letter-spacing: -1px;
-
-    /* Premium Gradient Text */
-    background: linear-gradient(135deg, #1D1D1F 0%, #555 100%);
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    -webkit-background-clip: text;
-}
-
-.hero-subtitle {
-    font-size: 1.1rem;
-    color: var(--text-secondary);
-    font-weight: 500;
-}
-
-/* Auth Segmented Control */
-.auth-tabs {
-    background: rgba(0, 0, 0, 0.03);
-    padding: 6px;
-    border-radius: 16px;
-    display: flex;
-    width: 100%;
-    margin-bottom: 32px;
-}
-
-.auth-tab {
-    flex: 1;
-    text-align: center;
-    padding: 12px;
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--text-secondary);
-    cursor: pointer;
-    border-radius: 12px;
-    transition: all 0.3s var(--ease-ios);
-}
-
-.auth-tab.active {
-    background: white;
-    color: var(--text-primary);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.social-divider {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    margin: 24px 0;
-    font-size: 0.8rem;
-    color: var(--text-tertiary);
-}
-
-.social-divider::before,
-.social-divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(0, 0, 0, 0.1);
-}
-
-.social-divider span {
-    padding: 0 12px;
-}
-
-/* Google Button Style */
-.btn-google {
-    background: white;
-    color: #1D1D1F;
-    border: 1px solid rgba(0, 0, 0, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    transition: all 0.2s;
-}
-
-.btn-google:hover {
-    background: #f8f8f8;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-@keyframes float {
-
-    0%,
-    100% {
-        transform: translateY(0);
-    }
-
-    50% {
-        transform: translateY(-10px);
-    }
-}
-
-
-/* --- Header Actions / Icon Buttons --- */
-.header-actions {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    height: 100%;
-}
-
-.icon-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-}
-
-/* --- User Avatar --- */
-.user-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    overflow: hidden;
-    cursor: pointer;
-    border: 2px solid rgba(255, 255, 255, 0.8);
-    transition: transform 0.2s, border-color 0.2s;
-    position: relative;
-    z-index: 1001;
-    pointer-events: auto;
-}
-
-.user-avatar:hover {
-    transform: scale(1.1);
-    border-color: var(--accent-color);
-    /* Blue glow on hover */
-    box-shadow: 0 0 15px var(--accent-glow);
-}
-
-.user-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    pointer-events: none;
-    /* Let the click pass through to the wrapper */
-}
-
+/* --- Tags & Chips --- */
 .category-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
@@ -945,7 +972,6 @@ select:focus {
     font-weight: 600;
 }
 
-/* --- Subcategory Chips --- */
 .subcategory-scroll {
     display: flex;
     gap: 8px;
@@ -970,7 +996,6 @@ select:focus {
     border-color: var(--accent-color);
 }
 
-/* --- Priority Segmented Control --- */
 .priority-segmented-control {
     display: flex;
     background: rgba(0, 0, 0, 0.05);
@@ -1005,27 +1030,6 @@ select:focus {
     backdrop-filter: blur(4px);
 }
 
-.tag-urgent {
-    color: #ff3b30;
-}
-
-/* Red */
-.tag-overdue {
-    color: #ff3b30;
-    text-decoration: underline;
-}
-
-.tag-soon {
-    color: #ff9500;
-}
-
-/* Orange */
-.tag-far {
-    color: #007aff;
-}
-
-/* Blue */
-
 .savings-hint {
     font-size: 0.75rem;
     color: var(--text-secondary);
@@ -1033,8 +1037,7 @@ select:focus {
     font-style: italic;
 }
 
-
-/* --- View Toggle Buttons --- */
+/* --- View Toggle --- */
 .view-toggle {
     display: flex;
     background: rgba(0, 0, 0, 0.05);
@@ -1060,7 +1063,7 @@ select:focus {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* --- Timeline View Styles --- */
+/* --- Timeline --- */
 .timeline-container {
     position: relative;
     padding: 20px 0;
@@ -1146,7 +1149,7 @@ select:focus {
     }
 }
 
-/* --- Card Time Tag Redesign --- */
+/* --- Overlay Badges --- */
 .card-overlay-badge {
     position: absolute;
     top: 12px;
@@ -1189,7 +1192,6 @@ select:focus {
     background: #FF3B30;
 }
 
-/* --- Discount Badge --- */
 .discount-badge {
     position: absolute;
     top: 12px;
@@ -1204,7 +1206,32 @@ select:focus {
     box-shadow: 0 4px 10px rgba(255, 59, 48, 0.3);
 }
 
-/* --- Ad Slot (In-Grid) --- */
+.tag-sale {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: rgba(255, 215, 0, 0.9);
+    color: #5a4a00;
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 12px;
+    z-index: 10;
+}
+
+.original-price {
+    text-decoration: line-through;
+    color: var(--text-tertiary);
+    font-size: 0.85rem;
+    margin-bottom: 2px;
+}
+
+.sale-price {
+    color: #E68A00;
+    font-weight: 700;
+}
+
+/* --- Ads --- */
 .ad-wrapper {
     width: 100%;
     margin-bottom: 24px;
@@ -1241,19 +1268,9 @@ select:focus {
     margin-bottom: 16px;
 }
 
-/* --- Content Area Constraint --- */
-#content-area {
-    max-width: 1100px;
-    margin: 0 auto;
-    position: relative;
-    z-index: 1;
-}
-
-/* --- Side Banner Ads (Skyscraper) --- */
 .ad-side-banner {
     position: fixed;
     top: 120px;
-    /* Below header */
     width: 160px;
     height: 600px;
     background: rgba(255, 255, 255, 0.4);
@@ -1267,7 +1284,6 @@ select:focus {
     padding: 16px;
     text-align: center;
     z-index: 90;
-    /* Below modal/header */
     transition: opacity 0.3s;
 }
 
@@ -1279,14 +1295,56 @@ select:focus {
     right: 20px;
 }
 
-/* Hide side banners on smaller screens */
 @media (max-width: 1500px) {
     .ad-side-banner {
         display: none;
     }
 }
 
-/* --- Combo Builder Styles --- */
+/* --- Content & Empty States --- */
+#content-area {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+}
+
+.empty-state-card {
+    text-align: center;
+    padding: 48px 24px;
+    margin: 32px auto;
+    max-width: 400px;
+    animation: fadeUp 0.5s ease-out;
+}
+
+.empty-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    display: block;
+    animation: float 5s ease-in-out infinite;
+}
+
+.empty-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text-primary);
+}
+
+.empty-text {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    line-height: 1.5;
+}
+
+.empty-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* --- Combo & AI Results --- */
 .combo-layout {
     display: flex;
     gap: 24px;
@@ -1377,7 +1435,6 @@ select:focus {
     background: rgba(255, 255, 255, 0.6);
 }
 
-/* --- AI Results Styles --- */
 .ai-results-container {
     padding: 16px;
     max-height: 400px;
@@ -1388,7 +1445,6 @@ select:focus {
     padding: 12px;
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid #c9a0dc;
-    /* Light purple tint */
     border-radius: 12px;
     margin-bottom: 12px;
     box-shadow: 0 4px 12px rgba(168, 85, 247, 0.15);
@@ -1407,69 +1463,7 @@ select:focus {
     font-weight: 500;
 }
 
-/* --- Sale UI --- */
-.tag-sale {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    background: rgba(255, 215, 0, 0.9);
-    color: #5a4a00;
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 12px;
-    z-index: 10;
-}
-
-.original-price {
-    text-decoration: line-through;
-    color: var(--text-tertiary);
-    font-size: 0.85rem;
-    margin-bottom: 2px;
-}
-
-.sale-price {
-    color: #E68A00;
-    /* Darker amber/orange */
-    font-weight: 700;
-}
-
-/* --- Enhanced Empty State Cards (Task 2.1) --- */
-.empty-state-card {
-    text-align: center;
-    padding: 48px 24px;
-    margin: 32px auto;
-    max-width: 400px;
-    animation: fadeUp 0.5s ease-out;
-}
-
-.empty-icon {
-    font-size: 3rem;
-    margin-bottom: 16px;
-    display: block;
-    animation: float 5s ease-in-out infinite;
-}
-
-.empty-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: var(--text-primary);
-}
-
-.empty-text {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin-bottom: 24px;
-    line-height: 1.5;
-}
-
-.empty-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
+/* --- Toggles --- */
 .toggle-switch-label {
     position: relative;
     display: inline-block;

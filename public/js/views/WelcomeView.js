@@ -10,16 +10,24 @@ export const WelcomeView = {
             updateUI();
         };
 
-        window.toggleLang = () => {
+        // FIX: Re-render content immediately after toggling
+        window.toggleLang = async () => {
             i18n.toggle();
-            // Re-render
-            document.getElementById('app').innerHTML = ''; // Force clear
-            WelcomeView.render().then(html => document.getElementById('app').innerHTML = html);
+            const app = document.getElementById('app');
+            app.innerHTML = await WelcomeView.render();
         };
 
         window.toggleAbout = () => {
             const el = document.getElementById('about-modal');
-            el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+            if (el) {
+                if (el.style.display === 'flex') {
+                    el.classList.remove('active');
+                    setTimeout(() => el.style.display = 'none', 300);
+                } else {
+                    el.style.display = 'flex';
+                    requestAnimationFrame(() => el.classList.add('active'));
+                }
+            }
         };
 
         const updateUI = () => {
@@ -29,20 +37,22 @@ export const WelcomeView = {
             const tabSignup = document.getElementById('tab-signup');
             const errorMsg = document.getElementById('auth-error');
 
+            if (!submitBtn) return; // Guard clause
+
             if (isLoginMode) {
                 tabLogin.classList.add('active');
                 tabSignup.classList.remove('active');
-                submitBtn.textContent = "Log In";
+                submitBtn.textContent = i18n.lang === 'tr' ? "Giriş Yap" : "Log In";
                 nameField.style.display = 'none';
                 nameField.querySelector('input').required = false;
             } else {
                 tabLogin.classList.remove('active');
                 tabSignup.classList.add('active');
-                submitBtn.textContent = "Sign Up";
+                submitBtn.textContent = i18n.lang === 'tr' ? "Kayıt Ol" : "Sign Up";
                 nameField.style.display = 'block';
                 nameField.querySelector('input').required = true;
             }
-            errorMsg.style.display = 'none';
+            if (errorMsg) errorMsg.style.display = 'none';
         };
 
         window.handleAuthSubmit = async (e) => {
@@ -63,7 +73,6 @@ export const WelcomeView = {
                 } else {
                     await authService.registerWithEmail(email, password, name);
                 }
-                // Auth listener in app.js handles redirect
             } catch (error) {
                 let message = "Authentication failed.";
                 if (error.code === 'auth/invalid-credential') message = "Invalid email or password.";
@@ -72,7 +81,7 @@ export const WelcomeView = {
                 errorMsg.textContent = message;
                 errorMsg.style.display = 'block';
                 btn.disabled = false;
-                btn.textContent = isLoginMode ? "Log In" : "Sign Up";
+                btn.textContent = isLoginMode ? (i18n.lang === 'tr' ? "Giriş Yap" : "Log In") : (i18n.lang === 'tr' ? "Kayıt Ol" : "Sign Up");
             }
         };
 
@@ -82,60 +91,68 @@ export const WelcomeView = {
 
         setTimeout(() => { if(document.getElementById('auth-submit-btn')) updateUI(); }, 0);
 
-        // Mascot: Simple greeting
-        if (window.aiCompanion) window.aiCompanion.say("Hello! I'm your WishOne guide.", "welcome");
+        setTimeout(() => {
+            if (window.aiCompanion) window.aiCompanion.say(i18n.t('welcome.greeting'), "welcome");
+        }, 800);
+
+        const currentLang = i18n.lang.toUpperCase();
 
         return `
             <div class="welcome-container">
                 <div class="premium-glow"></div>
 
-                <button onclick="window.toggleLang()" class="btn-text" style="position:absolute; top:20px; right:20px; z-index:10; font-weight:bold;">${i18n.lang.toUpperCase()}</button>
+                <button onclick="window.toggleLang()" class="btn-text lang-toggle" style="position:absolute; top:20px; right:20px; z-index:10; font-weight:700; background:rgba(255,255,255,0.5); padding:8px 16px; border-radius:20px;">
+                    ${currentLang === 'EN' ? '🇹🇷 TR' : '🇺🇸 EN'}
+                </button>
 
-                <div class="glass-panel auth-card">
-                    <div class="brand-hero">
-                        <img src="/img/icon.png" alt="WishOne" style="width: 64px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.1); margin-bottom: 16px; object-fit: contain;">
-                        <h1 class="hero-title" style="font-size:2rem;">WishOne</h1>
-                        <p style="font-size:0.9rem; color:var(--text-secondary); margin-top:-4px;">${i18n.t('welcome.by')}</p>
-                        <p class="hero-subtitle" style="margin-top:12px; font-style:italic;">"${i18n.t('welcome.slogan')}"</p>
+                <div class="glass-panel auth-card lighter-card">
+                    <div class="brand-hero compact-hero">
+                        <img src="/img/icon.png" alt="WishOne" class="hero-icon-small">
+                        <h1 class="hero-title compact-title">WishOne</h1>
+                        <p class="hero-brand-text">${i18n.t('welcome.by')}</p>
+                        <p class="hero-subtitle compact-subtitle">"${i18n.t('welcome.slogan')}"</p>
                     </div>
 
-                    <div class="auth-tabs">
-                        <div id="tab-login" class="auth-tab active" onclick="window.setAuthMode('login')">Log In</div>
-                        <div id="tab-signup" class="auth-tab" onclick="window.setAuthMode('signup')">Sign Up</div>
+                    <div class="auth-tabs compact-tabs">
+                        <div id="tab-login" class="auth-tab active" onclick="window.setAuthMode('login')">${i18n.lang === 'tr' ? "Giriş" : "Log In"}</div>
+                        <div id="tab-signup" class="auth-tab" onclick="window.setAuthMode('signup')">${i18n.lang === 'tr' ? "Kayıt" : "Sign Up"}</div>
                     </div>
 
                     <form onsubmit="window.handleAuthSubmit(event)" style="width: 100%;">
-                        <div class="form-group" id="field-name" style="display:none; animation: fadeUp 0.3s;">
-                            <label>${i18n.t('profile.fullname')}</label>
-                            <div class="input-with-icon"><span class="input-icon">👤</span><input type="text" id="name" placeholder="Name"></div>
+                        <div class="form-group compact-group" id="field-name" style="display:none; animation: fadeUp 0.3s;">
+                            <div class="input-with-icon"><span class="input-icon">👤</span><input type="text" id="name" placeholder="${i18n.t('profile.fullname')}"></div>
                         </div>
-                        <div class="form-group">
-                            <label>Email</label>
-                            <div class="input-with-icon"><span class="input-icon">✉️</span><input type="email" id="email" placeholder="name@example.com" required></div>
+                        <div class="form-group compact-group">
+                            <div class="input-with-icon"><span class="input-icon">✉️</span><input type="email" id="email" placeholder="Email" required></div>
                         </div>
-                        <div class="form-group">
-                            <label>Password</label>
+                        <div class="form-group compact-group">
                             <div class="input-with-icon"><span class="input-icon">🔒</span><input type="password" id="password" placeholder="••••••" required minlength="6"></div>
                         </div>
-                        <p id="auth-error" style="color: #ff3b30; font-size: 0.9rem; display: none; margin-bottom: 16px; text-align:center;"></p>
-                        <button type="submit" id="auth-submit-btn" class="btn-primary" style="width: 100%;">Log In</button>
+                        <p id="auth-error" style="color: #ff3b30; font-size: 0.85rem; display: none; margin-bottom: 12px; text-align:center;"></p>
+                        <button type="submit" id="auth-submit-btn" class="btn-primary compact-btn" style="width: 100%; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">Log In</button>
                     </form>
 
-                    <div class="social-divider" style="margin: 24px 0;"><span>${i18n.t('common.or')}</span></div>
-                    <button class="btn-primary btn-google" onclick="window.handleGoogleLogin()" style="width: 100%; background: white; color: #1D1D1F; border: 1px solid rgba(0,0,0,0.1);">
+                    <div class="social-divider compact-divider"><span>${i18n.t('common.or')}</span></div>
+                    
+                    <button class="btn-primary btn-google compact-btn" onclick="window.handleGoogleLogin()" style="width: 100%;">
                         <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" height="18"><span>Google</span>
                     </button>
 
-                    <button class="btn-text" onclick="window.toggleAbout()" style="margin-top:24px; font-size:0.8rem; opacity:0.7;">${i18n.t('welcome.about')}</button>
+                    <button class="btn-text" onclick="window.toggleAbout()" style="margin-top:20px; font-size:0.8rem; opacity:0.6;">${i18n.t('welcome.about')}</button>
                 </div>
             </div>
 
             <div id="about-modal" class="modal-overlay">
-                <div class="modal-content" style="text-align:center;">
-                    <div class="modal-header" style="justify-content:center;"><h3>${i18n.t('welcome.about')}</h3></div>
-                    <p style="margin-bottom:24px;">${i18n.t('welcome.about_text')}</p>
-                    <p style="font-size:0.8rem; color:var(--text-tertiary);">${i18n.t('welcome.rights')}</p>
-                    <button class="btn-primary" onclick="window.toggleAbout()" style="margin-top:20px;">Close</button>
+                <div class="modal-content" style="text-align:center; max-width:400px;">
+                    <div class="modal-header" style="justify-content:center; margin-bottom:16px;">
+                        <h3 style="font-size:1.2rem;">${i18n.t('welcome.about_title')}</h3>
+                    </div>
+                    <p style="margin-bottom:16px; line-height:1.6;">${i18n.t('welcome.about_text')}</p>
+                    <p style="margin-bottom:24px; font-size:0.9rem; color:var(--text-secondary); background:rgba(0,0,0,0.03); padding:12px; border-radius:12px;">
+                        🤖 ${i18n.t('welcome.about_note')}
+                    </p>
+                    <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:20px;">${i18n.t('welcome.rights')}</p>
+                    <button class="btn-primary" onclick="window.toggleAbout()" style="width:100%;">${i18n.t('common.back')}</button>
                 </div>
             </div>
         `;

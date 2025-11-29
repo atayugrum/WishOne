@@ -9,10 +9,13 @@ export const TRANSLATIONS = {
         },
         welcome: {
             slogan: "Curate your life. Manifest your dreams.",
-            by: "WishOne by AtOne",
+            by: "WishOne by AtOne", // Branding text
             about: "About WishOne",
-            about_text: "WishOne is an AI-powered social wishlist experience designed to help you visualize and achieve your goals. The AtOne Monkey is your AI companion on this journey.",
-            rights: "© 2025 AtOne Ecosystem. All rights reserved."
+            about_title: "About WishOne & AtOne",
+            about_text: "WishOne is an AI-powered social wishlist experience designed to help you visualize and achieve your goals.",
+            about_note: "The AtOne Monkey is your fictional, AI-driven companion on this journey.",
+            rights: "© 2025 AtOne Ecosystem. All rights reserved.",
+            greeting: "Hello! I'm your WishOne guide."
         },
         onboarding: {
             title: "Almost There!",
@@ -21,6 +24,7 @@ export const TRANSLATIONS = {
             birthday: "Your Birthday",
             complete: "Start Manifesting"
         },
+        // ... (Keep existing home, friends, inspo, etc. translations as is)
         home: {
             title: "My Wishlist",
             subtitle: "Everything you're manifesting.",
@@ -41,7 +45,13 @@ export const TRANSLATIONS = {
             empty: "No friends yet. Add someone!",
             compatibility: "🔮 Check Compatibility",
             compat_score: "Compatibility Score",
-            analyzing: "Analyzing vibes..."
+            analyzing: "Analyzing vibes...",
+            private_title: "Private Wishlist",
+            private_msg: "has made their wishlist private.",
+            reserved_by_you: "Reserved by You",
+            already_reserved: "Someone else is already getting this!",
+            empty_title: "Nothing Here Yet",
+            empty_msg: "hasn't added any wishes yet."
         },
         inspo: {
             title: "Inspo Boards",
@@ -132,7 +142,16 @@ export const TRANSLATIONS = {
             delete: "Delete",
             edit: "Edit",
             confirm: "Are you sure?",
-            or: "OR"
+            or: "OR",
+            back: "Back"
+        },
+        time: {
+            overdue: "Overdue",
+            today: "Today!",
+            days_left: "days left",
+            months: "months",
+            next_month: "Next Month",
+            years: "years"
         }
     },
     tr: {
@@ -147,8 +166,11 @@ export const TRANSLATIONS = {
             slogan: "Hayatını düzenle. Hayallerini gerçekleştir.",
             by: "WishOne, AtOne tarafından sunulur",
             about: "WishOne Hakkında",
-            about_text: "WishOne, hedeflerinizi görselleştirmenize ve bunlara ulaşmanıza yardımcı olmak için tasarlanmış yapay zeka destekli bir sosyal istek listesi deneyimidir. AtOne Maymunu, bu yolculukta AI arkadaşınızdır.",
-            rights: "© 2025 AtOne Ecosystem. Tüm hakları saklıdır."
+            about_title: "WishOne & AtOne Hakkında",
+            about_text: "WishOne, hedeflerinizi görselleştirmenize ve bunlara ulaşmanıza yardımcı olmak için tasarlanmış yapay zeka destekli bir sosyal istek listesi deneyimidir.",
+            about_note: "AtOne Maymunu, bu yolculukta kurgusal, yapay zeka destekli arkadaşınızdır.",
+            rights: "© 2025 AtOne Ecosystem. Tüm hakları saklıdır.",
+            greeting: "Merhaba! Ben WishOne rehberin."
         },
         onboarding: {
             title: "Az Kaldı!",
@@ -157,6 +179,7 @@ export const TRANSLATIONS = {
             birthday: "Doğum Günün",
             complete: "Başla"
         },
+        // ... (Keep existing home, friends, inspo, etc. translations as is)
         home: {
             title: "İstek Listem",
             subtitle: "Hayal ettiğin her şey.",
@@ -177,7 +200,13 @@ export const TRANSLATIONS = {
             empty: "Henüz arkadaşın yok. Birini ekle!",
             compatibility: "🔮 Uyumluluk Analizi",
             compat_score: "Uyumluluk Puanı",
-            analyzing: "Analiz ediliyor..."
+            analyzing: "Analiz ediliyor...",
+            private_title: "Gizli Liste",
+            private_msg: "listesini gizli yapmış.",
+            reserved_by_you: "Senin Tarafından Rezerve",
+            already_reserved: "Bunu başkası alıyor!",
+            empty_title: "Henüz Bir Şey Yok",
+            empty_msg: "henüz bir istek eklememiş."
         },
         inspo: {
             title: "Panolar",
@@ -268,7 +297,16 @@ export const TRANSLATIONS = {
             delete: "Sil",
             edit: "Düzenle",
             confirm: "Emin misin?",
-            or: "VEYA"
+            or: "VEYA",
+            back: "Geri"
+        },
+        time: {
+            overdue: "Gecikmiş",
+            today: "Bugün!",
+            days_left: "gün kaldı",
+            months: "ay",
+            next_month: "Gelecek Ay",
+            years: "yıl"
         }
     }
 };

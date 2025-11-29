@@ -45,13 +45,18 @@ export class AddItemModal {
                                     <input type="url" id="magic-url-input" placeholder="https://..." style="flex: 1;">
                                     <button type="button" id="btn-fetch-magic" class="btn-primary" style="min-width: 80px;">${i18n.t('modal.fetch')}</button>
                                 </div>
-                                <p id="magic-error" style="color:#ff3b30; font-size:0.85rem; display:none;"></p>
+                                <p id="magic-error" style="color:#ff3b30; font-size:0.85rem; display:none; margin-top:4px;"></p>
                             </div>
                         </div>
                     </div>
 
+                    <div id="ai-insight-box" style="display:none; background:rgba(100, 200, 255, 0.1); border:1px solid rgba(100, 200, 255, 0.3); padding:12px; border-radius:12px; margin-bottom:20px;">
+                        <strong style="display:block; font-size:0.8rem; color:#007AFF; margin-bottom:4px;">🤖 AI Insight</strong>
+                        <p id="ai-reason-text" style="font-size:0.9rem; color:var(--text-primary); margin:0; line-height:1.4;"></p>
+                    </div>
+
                     <div class="form-row">
-                        <div class="form-group" style="flex:2;"><label>${i18n.t('modal.price')}</label><input type="number" name="price" id="input-price" placeholder="0" required step="0.01"></div>
+                        <div class="form-group" style="flex:2;"><label>${i18n.t('modal.price')}</label><input type="number" name="price" id="input-price" placeholder="0" step="0.01"></div>
                         <div class="form-group" style="flex:1;"><label>Currency</label><select name="currency" id="input-currency"><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
                     </div>
                     
@@ -60,8 +65,8 @@ export class AddItemModal {
                         <select name="occasion" id="input-occasion" onchange="window.handleOccasionChange(this)">
                             <option value="">None</option>
                             <option value="Birthday">🎂 Birthday</option>
-                            <option value="New Year">🎄 New Year</option>
-                            <option value="Anniversary">💖 Anniversary</option>
+                            <option value="New Year">🎆 New Year</option>
+                            <option value="Anniversary">💍 Anniversary</option>
                             <option value="Custom">✏️ Custom...</option>
                         </select>
                         <input type="text" id="input-custom-occasion" placeholder="${i18n.t('modal.occasion_custom')}" style="display:none; margin-top:8px;">
@@ -77,7 +82,9 @@ export class AddItemModal {
                         </select>
                     </div>
 
-                    <div class="form-group"><label>${i18n.t('modal.category')}</label><div class="category-grid">${categoryGridHtml}</div><input type="hidden" name="category" id="hidden-category" required></div>
+                    <div class="form-group"><label>${i18n.t('modal.category')}</label><div class="category-grid">${categoryGridHtml}</div><input type="hidden" name="category" id="hidden-category" required>
+                    <input type="hidden" name="subcategory" id="hidden-subcategory"></div>
+                    
                     <div class="form-group" id="custom-cat-container" style="display:none;">
                         <label>${i18n.t('modal.customCategory')}</label>
                         <input type="text" id="input-custom-cat" placeholder="My Category Name">
@@ -85,7 +92,11 @@ export class AddItemModal {
 
                     <div class="form-group">
                         <label>${i18n.t('modal.priority')}</label>
-                        <div class="priority-segmented-control"><label><input type="radio" name="priority" value="Low"><span>Low</span></label><label><input type="radio" name="priority" value="Medium" checked><span>Med</span></label><label><input type="radio" name="priority" value="High"><span>High</span></label></div>
+                        <div class="priority-segmented-control">
+                            <label><input type="radio" name="priority" value="Low" id="prio-low"><span>Low</span></label>
+                            <label><input type="radio" name="priority" value="Medium" id="prio-med" checked><span>Med</span></label>
+                            <label><input type="radio" name="priority" value="High" id="prio-high"><span>High</span></label>
+                        </div>
                     </div>
                     
                     <div class="form-group"><label>Target Date</label><input type="date" name="targetDate" id="input-date" style="width: 100%;"></div>
@@ -121,21 +132,24 @@ export class AddItemModal {
         const btnFetchMagic = this.overlay.querySelector('#btn-fetch-magic');
         const magicInput = this.overlay.querySelector('#magic-url-input');
         const customCatContainer = this.overlay.querySelector('#custom-cat-container');
+        const errorMsg = document.getElementById('magic-error');
+        const insightBox = document.getElementById('ai-insight-box');
+        const insightText = document.getElementById('ai-reason-text');
 
         // Toggle Magic Container
         btnMagicAdd.onclick = () => {
             const isHidden = magicContainer.style.display === 'none';
             magicContainer.style.display = isHidden ? 'block' : 'none';
-            if(isHidden) magicInput.focus();
+            if (isHidden) magicInput.focus();
         };
 
-        // File Upload Handler (Base64)
+        // File Upload
         window.handleImageUpload = (input) => {
             const file = input.files[0];
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    imgInput.value = e.target.result; // Set data URI as URL
+                    imgInput.value = e.target.result;
                     imgPreview.style.backgroundImage = `url('${e.target.result}')`;
                     imgPreview.style.display = 'block';
                 };
@@ -143,37 +157,81 @@ export class AddItemModal {
             }
         };
 
-        // Custom Occasion Handler
+        // Custom Occasion
         window.handleOccasionChange = (select) => {
             const customInput = document.getElementById('input-custom-occasion');
             customInput.style.display = select.value === 'Custom' ? 'block' : 'none';
         };
 
-        // Magic Fetch
+        // Magic Fetch with Robust Validation
         btnFetchMagic.addEventListener('click', async () => {
             if (!authService.canUseFeature(FEATURES.MAGIC_ADD)) { premiumModal.open(); return; }
+
             const url = magicInput.value.trim();
             if (!url) return;
 
-            if(window.aiCompanion) window.aiCompanion.setState('thinking');
+            errorMsg.style.display = 'none';
+            insightBox.style.display = 'none';
+
+            if (window.aiCompanion) window.aiCompanion.setState('thinking');
+
             try {
-                btnFetchMagic.innerHTML = `...`; btnFetchMagic.disabled = true;
+                btnFetchMagic.innerHTML = `...`;
+                btnFetchMagic.disabled = true;
+
                 const { apiCall } = await import('../config/api.js');
                 const metaData = await apiCall('/api/product/metadata', 'POST', { url });
-                
+                console.log("Magic Fetch Result:", metaData);
+
+                // Populate Fields
                 if (metaData.title) this.overlay.querySelector('#input-title').value = metaData.title;
-                if (metaData.imageUrl) { imgInput.value = metaData.imageUrl; imgInput.dispatchEvent(new Event('input')); }
+
+                if (metaData.imageUrl) {
+                    imgInput.value = metaData.imageUrl;
+                    imgInput.dispatchEvent(new Event('input'));
+                }
+
                 if (metaData.price !== null) this.overlay.querySelector('#input-price').value = metaData.price;
                 if (metaData.currency) this.overlay.querySelector('#input-currency').value = metaData.currency;
-                
-                if (metaData.category && window.selectCategory) window.selectCategory(metaData.category);
-                
-                magicContainer.style.display = 'none';
-                if(window.aiCompanion) window.aiCompanion.say("Found it!", "magic", 2000);
+
+                if (metaData.category && window.selectCategory) {
+                    window.selectCategory(metaData.category);
+                }
+
+                if (metaData.subcategory) {
+                    this.overlay.querySelector('#hidden-subcategory').value = metaData.subcategory;
+                }
+
+                // Robust Priority Selection
+                if (metaData.priorityLevel) {
+                    // Match "Medium" to "Medium", "medium", etc.
+                    const pVal = metaData.priorityLevel.charAt(0).toUpperCase() + metaData.priorityLevel.slice(1).toLowerCase();
+                    const radio = this.overlay.querySelector(`input[name="priority"][value="${pVal}"]`);
+                    if (radio) radio.checked = true;
+                }
+
+                if (metaData.reason) {
+                    insightBox.style.display = 'block';
+                    insightText.textContent = metaData.reason;
+                }
+
+                // Hide magic box if successful
+                if (metaData.title) {
+                    magicContainer.style.display = 'none';
+                    if (window.aiCompanion) window.aiCompanion.say("Found it!", "magic", 2000);
+                } else {
+                    errorMsg.textContent = "Found some data, but please check the fields.";
+                    errorMsg.style.display = 'block';
+                }
+
             } catch (error) {
-                if(window.aiCompanion) window.aiCompanion.say("I couldn't read that link.", "error");
+                console.warn("Magic Fetch Error:", error);
+                errorMsg.textContent = "Could not read this link. Try filling details manually.";
+                errorMsg.style.display = 'block';
+                if (window.aiCompanion) window.aiCompanion.say("I couldn't read that page.", "error");
             } finally {
-                btnFetchMagic.textContent = i18n.t('modal.fetch'); btnFetchMagic.disabled = false;
+                btnFetchMagic.textContent = i18n.t('modal.fetch');
+                btnFetchMagic.disabled = false;
             }
         });
 
@@ -188,12 +246,12 @@ export class AddItemModal {
         });
 
         window.selectCategory = (key) => {
-             const pills = this.overlay.querySelectorAll('.cat-pill');
-             pills.forEach(p => p.classList.remove('selected'));
-             const selected = this.overlay.querySelector(`.cat-pill[data-cat="${key}"]`);
-             if (selected) selected.classList.add('selected');
-             this.overlay.querySelector('#hidden-category').value = key;
-             customCatContainer.style.display = key === 'Custom' ? 'block' : 'none';
+            const pills = this.overlay.querySelectorAll('.cat-pill');
+            pills.forEach(p => p.classList.remove('selected'));
+            const selected = this.overlay.querySelector(`.cat-pill[data-cat="${key}"]`);
+            if (selected) selected.classList.add('selected');
+            this.overlay.querySelector('#hidden-category').value = key;
+            customCatContainer.style.display = key === 'Custom' ? 'block' : 'none';
         };
 
         form.addEventListener('submit', async (e) => {
@@ -205,7 +263,7 @@ export class AddItemModal {
             let category = formData.get('category');
             if (category === 'Custom') {
                 const customName = document.getElementById('input-custom-cat').value.trim();
-                if (customName) category = customName; 
+                if (customName) category = customName;
             }
 
             let occasion = formData.get('occasion');
@@ -215,7 +273,7 @@ export class AddItemModal {
 
             const itemData = {
                 title: formData.get('title'),
-                price: parseFloat(formData.get('price')),
+                price: parseFloat(formData.get('price')) || 0,
                 currency: formData.get('currency'),
                 category: category,
                 subcategory: formData.get('subcategory') || null,
@@ -238,6 +296,7 @@ export class AddItemModal {
                 this.close();
                 if (this.onItemSaved) this.onItemSaved();
             } catch (e) {
+                console.error(e);
                 alert(i18n.t('common.error'));
             } finally {
                 btn.textContent = i18n.t('modal.save'); btn.disabled = false;
@@ -253,7 +312,7 @@ export class AddItemModal {
     open(itemToEdit = null) {
         this.overlay.style.display = 'flex';
         requestAnimationFrame(() => this.overlay.classList.add('active'));
-        
+
         const form = this.overlay.querySelector('#add-item-form');
         form.reset();
         this.editingId = null;
@@ -262,6 +321,9 @@ export class AddItemModal {
         this.overlay.querySelector('#img-preview').style.display = 'none';
         this.overlay.querySelector('#custom-cat-container').style.display = 'none';
         document.getElementById('input-custom-occasion').style.display = 'none';
+        document.getElementById('magic-url-container').style.display = 'none';
+        document.getElementById('magic-error').style.display = 'none';
+        document.getElementById('ai-insight-box').style.display = 'none';
 
         if (itemToEdit) {
             this.editingId = itemToEdit.id;
@@ -270,10 +332,9 @@ export class AddItemModal {
             this.overlay.querySelector('#input-price').value = itemToEdit.price;
             this.overlay.querySelector('#input-currency').value = itemToEdit.currency;
             this.overlay.querySelector('#img-input').value = itemToEdit.imageUrl;
-            
+
             if (itemToEdit.occasion) {
                 const occSelect = this.overlay.querySelector('#input-occasion');
-                // Check if occasion is standard
                 const standard = Array.from(occSelect.options).some(o => o.value === itemToEdit.occasion);
                 if (standard) {
                     occSelect.value = itemToEdit.occasion;
@@ -288,10 +349,10 @@ export class AddItemModal {
             if (itemToEdit.visibility) this.overlay.querySelector('#input-visibility').value = itemToEdit.visibility;
             if (itemToEdit.targetDate) this.overlay.querySelector('#input-date').value = itemToEdit.targetDate;
             if (itemToEdit.imageUrl) {
-                 this.overlay.querySelector('#img-preview').style.display = 'block';
-                 this.overlay.querySelector('#img-preview').style.backgroundImage = `url('${itemToEdit.imageUrl}')`;
+                this.overlay.querySelector('#img-preview').style.display = 'block';
+                this.overlay.querySelector('#img-preview').style.backgroundImage = `url('${itemToEdit.imageUrl}')`;
             }
-            
+
             if (itemToEdit.category) {
                 if (CATEGORIES[itemToEdit.category]) {
                     window.selectCategory(itemToEdit.category);
@@ -299,6 +360,11 @@ export class AddItemModal {
                     window.selectCategory('Custom');
                     document.getElementById('input-custom-cat').value = itemToEdit.category;
                 }
+            }
+
+            if (itemToEdit.priority) {
+                const radio = this.overlay.querySelector(`input[name="priority"][value="${itemToEdit.priority}"]`);
+                if (radio) radio.checked = true;
             }
         }
     }

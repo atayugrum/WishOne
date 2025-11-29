@@ -96,4 +96,9 @@ export class AICompanion {
             img.src = this.basePath + this.moods[mood];
         }
     }
+
+    // FIX: Added alias method to handle calls from other views
+    setState(mood) {
+        this.setMood(mood);
+    }
 }

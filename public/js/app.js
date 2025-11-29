@@ -2,7 +2,7 @@ import { Router } from './utils/Router.js';
 import { Header } from './components/Header.js';
 import { HomeView } from './views/HomeView.js';
 import { WelcomeView } from './views/WelcomeView.js';
-import { OnboardingView } from './views/OnboardingView.js'; // NEW
+import { OnboardingView } from './views/OnboardingView.js';
 import { FriendsView } from './views/FriendsView.js';
 import { FriendWishlistView } from './views/FriendWishlistView.js';
 import { PublicWishlistView } from './views/PublicWishlistView.js';
@@ -18,7 +18,7 @@ import { aiService } from './services/AIService.js';
 const routes = {
     '/': HomeView,
     '/welcome': WelcomeView,
-    '/onboarding': OnboardingView, // NEW
+    '/onboarding': OnboardingView,
     '/friends': FriendsView,
     '/friend-wishlist': FriendWishlistView,
     '/share': PublicWishlistView,
@@ -38,12 +38,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const router = new Router(routes);
 
+    // SAFETY FALLBACK: If stuck on "Loading..." for >3s, force Welcome screen.
+    const authTimeout = setTimeout(() => {
+        const app = document.getElementById('app');
+        if (app && app.innerText.includes('Loading...')) {
+            console.warn("Auth check timed out. Forcing Welcome View.");
+            window.location.hash = '#/welcome';
+            router.handleLocation();
+        }
+    }, 3000);
+
     authService.init((user, profile) => {
+        clearTimeout(authTimeout); // Cancel fallback if auth loads in time
+
+        if (window.location.hash.startsWith('#/share')) {
+            if (user) header.updateUser(user);
+            router.handleLocation();
+            return;
+        }
+
         if (user) {
-            // Check Profile Completion (Task 1.7)
+            // Milestone 1: Critical Registration Flow Check
             if (profile && !profile.isProfileComplete) {
                 header.hide();
-                window.location.hash = '#/onboarding';
+                if (window.location.hash !== '#/onboarding') {
+                    window.location.hash = '#/onboarding';
+                }
                 router.handleLocation();
                 return;
             }
@@ -51,20 +71,20 @@ document.addEventListener('DOMContentLoaded', () => {
             header.updateUser(user);
             header.show();
 
-            // Only greet on Home to avoid spamming
+            if (window.location.hash === '#/welcome' || window.location.hash === '#/onboarding') {
+                window.location.hash = '#/';
+            }
+
             if (window.location.hash === '#/' || window.location.hash === '') {
                 setTimeout(() => {
                     aiService.triggerReaction('login', { name: user.displayName || 'Dreamer' });
                 }, 1000);
             }
 
-            if (window.location.hash === '#/welcome' || window.location.hash === '#/onboarding') {
-                window.location.hash = '#/';
-            }
             router.handleLocation();
         } else {
             header.hide();
-            if (!window.location.hash.startsWith('#/share')) {
+            if (window.location.hash !== '#/welcome') {
                 window.location.hash = '#/welcome';
             }
             router.handleLocation();

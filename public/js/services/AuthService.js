@@ -73,7 +73,6 @@ export class AuthService {
         }
     }
 
-    // New Method for Onboarding
     async completeProfile(data) {
         if (!this.currentUser) throw new Error("No user");
         const userRef = doc(db, "users", this.currentUser.uid);
@@ -82,7 +81,6 @@ export class AuthService {
             birthday: data.birthday,
             isProfileComplete: true
         });
-        // Update local state
         this.userProfile.username = data.username;
         this.userProfile.birthday = data.birthday;
         this.userProfile.isProfileComplete = true;
@@ -94,32 +92,39 @@ export class AuthService {
             this.currentUser = user;
 
             if (user) {
-                const userRef = doc(db, "users", user.uid);
-                const snapshot = await getDoc(userRef);
+                try {
+                    const userRef = doc(db, "users", user.uid);
+                    const snapshot = await getDoc(userRef);
 
-                if (snapshot.exists()) {
-                    this.userProfile = snapshot.data();
-                } else {
-                    console.log("Creating new user profile...");
-                    const displayName = user.displayName || 'User';
-                    const newProfile = {
-                        uid: user.uid,
-                        email: user.email,
-                        displayName: displayName,
-                        photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}`,
-                        plan: 'free',
-                        friends: [],
-                        isPrivate: false,
-                        createdAt: new Date(),
-                        isProfileComplete: false // New Flag
-                    };
-                    await setDoc(userRef, newProfile);
-                    this.userProfile = newProfile;
+                    if (snapshot.exists()) {
+                        this.userProfile = snapshot.data();
+                    } else {
+                        console.log("Creating new user profile...");
+                        const displayName = user.displayName || 'User';
+                        const newProfile = {
+                            uid: user.uid,
+                            email: user.email,
+                            displayName: displayName,
+                            photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}`,
+                            plan: 'free',
+                            friends: [],
+                            isPrivate: false,
+                            createdAt: new Date(),
+                            isProfileComplete: false
+                        };
+                        await setDoc(userRef, newProfile);
+                        this.userProfile = newProfile;
+                    }
+                } catch (error) {
+                    console.error("Error fetching profile:", error);
+                    // Fallback: allow login but maybe restricted features
+                    this.userProfile = null; 
                 }
             } else {
                 this.userProfile = null;
             }
 
+            // CRITICAL FIX: Always call the callback, even if profile fetch failed
             callback(user, this.userProfile);
         });
     }
@@ -128,7 +133,6 @@ export class AuthService {
         return this.userProfile?.plan === 'premium';
     }
 
-    // ... (keep upgradeToPremium, trackFeatureUsage, etc.)
     async upgradeToPremium() {
         if (!this.currentUser) return;
         const userRef = doc(db, "users", this.currentUser.uid);
