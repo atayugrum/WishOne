@@ -5,53 +5,76 @@ export class AdSlot {
     constructor(config = {}) {
         this.element = document.createElement('div');
         this.element.className = 'ad-slot glass-panel';
+
         this.config = {
-            provider: 'internal', // 'internal' | 'adsense' | 'custom'
+            provider: 'mock', // Default to mock for now
+            slotId: '000000',
+            width: '100%',
+            height: '250px', // Default height
             ...config
         };
         this.render();
     }
 
     render() {
-        // 1. Premium Check (Task 6: Freemium)
         if (authService.isPremium) {
             this.element.style.display = 'none';
             return;
         }
 
-        this.element.innerHTML = ''; // Clear
+        this.element.style.padding = '16px';
+        this.element.style.textAlign = 'center';
+        this.element.style.display = 'flex';
+        this.element.style.flexDirection = 'column';
+        this.element.style.alignItems = 'center';
+        this.element.style.gap = '8px';
 
-        // 2. Provider Logic
+        // 1. Header
+        const header = document.createElement('div');
+        header.style.width = '100%';
+        header.style.display = 'flex';
+        header.style.justifyContent = 'space-between';
+        header.style.fontSize = '0.7rem';
+        header.style.color = 'var(--text-tertiary)';
+
+        header.innerHTML = `
+            <span>SPONSORED</span>
+            <span class="remove-ads-link" style="cursor:pointer; color:var(--accent-color);">Remove Ads</span>
+        `;
+        header.querySelector('.remove-ads-link').onclick = () => premiumModal.open();
+        this.element.appendChild(header);
+
+        // 2. Ad Content
+        const content = document.createElement('div');
+        content.style.width = '100%';
+        content.style.minHeight = this.config.height;
+
         if (this.config.provider === 'adsense') {
-            this._renderAdSense();
+            // Real AdSense Code
+            const ins = document.createElement('ins');
+            ins.className = 'adsbygoogle';
+            ins.style.display = 'block';
+            ins.setAttribute('data-ad-client', 'ca-pub-0000000000000000'); // Replace when approved
+            ins.setAttribute('data-ad-slot', this.config.slotId);
+            ins.setAttribute('data-ad-format', 'auto');
+            ins.setAttribute('data-full-width-responsive', 'true');
+            content.appendChild(ins);
+
+            try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) { }
         } else {
-            this._renderInternalAd();
+            // Mock / Placeholder Mode
+            content.style.background = 'rgba(0,0,0,0.05)';
+            content.style.border = '2px dashed rgba(0,0,0,0.1)';
+            content.style.borderRadius = '8px';
+            content.style.display = 'flex';
+            content.style.alignItems = 'center';
+            content.style.justifyContent = 'center';
+            content.style.color = 'var(--text-tertiary)';
+            content.style.fontSize = '0.9rem';
+            content.innerText = 'Ad Space (Mock)';
         }
-    }
 
-    _renderInternalAd() {
-        this.element.innerHTML = `
-            <div class="ad-content" style="cursor: pointer;">
-                <span class="ad-badge">Sponsored</span>
-                <h3>Upgrade to Premium</h3>
-                <p>Remove ads, unlock unlimited AI tools, and get price drop alerts!</p>
-                <div style="margin-top:8px; font-weight:bold; color:var(--accent-color);">Tap to Upgrade →</div>
-            </div>
-        `;
-
-        this.element.addEventListener('click', () => {
-            premiumModal.open();
-        });
-    }
-
-    _renderAdSense() {
-        // Placeholder for future AdSense integration
-        // In real app: inject <ins> tag and push to window.adsbygoogle
-        this.element.innerHTML = `
-            <div class="ad-network-placeholder" style="padding:20px; text-align:center; color:#999; font-size:0.8rem;">
-                [Ad Network Space]
-            </div>
-        `;
+        this.element.appendChild(content);
     }
 
     getElement() {

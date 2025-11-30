@@ -18,6 +18,7 @@ export class AuthService {
         this.onAuthCallback = null;
     }
 
+    // ... (login/register methods remain unchanged) ...
     async login() {
         try {
             const result = await signInWithPopup(auth, googleProvider);
@@ -57,7 +58,7 @@ export class AuthService {
         await signOut(auth);
         this.currentUser = null;
         this.userProfile = null;
-        localStorage.clear(); 
+        localStorage.clear();
     }
 
     async deleteUserAccount() {
@@ -73,17 +74,28 @@ export class AuthService {
         }
     }
 
+    // [UPDATE] Trigger callback to update App State (Header, Router Guard)
     async completeProfile(data) {
         if (!this.currentUser) throw new Error("No user");
         const userRef = doc(db, "users", this.currentUser.uid);
-        await updateDoc(userRef, {
+
+        const updates = {
             username: data.username,
             birthday: data.birthday,
-            isProfileComplete: true
-        });
-        this.userProfile.username = data.username;
-        this.userProfile.birthday = data.birthday;
-        this.userProfile.isProfileComplete = true;
+            isProfileComplete: true,
+            tutorialSeen: false
+        };
+
+        await updateDoc(userRef, updates);
+
+        if (this.userProfile) {
+            Object.assign(this.userProfile, updates);
+        }
+
+        // [NEW] Notify app.js to update Header visibility immediately
+        if (this.onAuthCallback) {
+            this.onAuthCallback(this.currentUser, this.userProfile);
+        }
     }
 
     init(callback) {
@@ -101,47 +113,54 @@ export class AuthService {
                     } else {
                         console.log("Creating new user profile...");
                         const displayName = user.displayName || 'User';
+
                         const newProfile = {
                             uid: user.uid,
                             email: user.email,
                             displayName: displayName,
                             photoURL: user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}`,
-                            plan: 'free',
-                            friends: [],
+                            premium: false,
                             isPrivate: false,
-                            createdAt: new Date(),
-                            isProfileComplete: false
+                            isProfileComplete: false,
+                            tutorialSeen: false,
+                            friends: [],
+                            language: localStorage.getItem('wishone_lang') || 'en',
+                            createdAt: new Date().toISOString()
                         };
+
                         await setDoc(userRef, newProfile);
                         this.userProfile = newProfile;
                     }
                 } catch (error) {
                     console.error("Error fetching profile:", error);
-                    // Fallback: allow login but maybe restricted features
-                    this.userProfile = null; 
+                    this.userProfile = null;
                 }
             } else {
                 this.userProfile = null;
             }
 
-            // CRITICAL FIX: Always call the callback, even if profile fetch failed
             callback(user, this.userProfile);
         });
     }
 
     get isPremium() {
-        return this.userProfile?.plan === 'premium';
+        return this.userProfile?.premium === true;
     }
 
+    // [UPDATE] Trigger callback here too
     async upgradeToPremium() {
         if (!this.currentUser) return;
         const userRef = doc(db, "users", this.currentUser.uid);
         await updateDoc(userRef, {
-            plan: 'premium',
-            planSince: new Date()
+            premium: true,
+            planSince: new Date().toISOString()
         });
         if (this.userProfile) {
-            this.userProfile.plan = 'premium';
+            this.userProfile.premium = true;
+        }
+        // [NEW] Notify app.js
+        if (this.onAuthCallback) {
+            this.onAuthCallback(this.currentUser, this.userProfile);
         }
     }
 

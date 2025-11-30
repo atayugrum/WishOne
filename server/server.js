@@ -6,7 +6,7 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const admin = require('firebase-admin');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 // Middleware
 app.use(cors());
@@ -111,25 +111,82 @@ function mapSubcategory(category, subcategory) {
 
 async function scrapeProduct(url) {
     try {
-        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'en-US' } });
+        const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' } });
         if (!response.ok) throw new Error(`Fetch failed: ${response.status}`);
         const html = await response.text();
         const $ = cheerio.load(html);
         const getMeta = (p) => $(`meta[property="${p}"]`).attr('content') || $(`meta[name="${p}"]`).attr('content');
 
-        let title = getMeta('og:title') || $('title').text() || '';
-        let image = getMeta('og:image') || $('link[rel="image_src"]').attr('href');
-        let description = getMeta('og:description') || '';
+        // 1. Initialize with standard Meta Tags
+        let title = getMeta('og:title') || getMeta('twitter:title') || $('title').text() || '';
+        let description = getMeta('og:description') || getMeta('twitter:description') || getMeta('description') || '';
+
+        // Image Priority: OpenGraph > Twitter > Link Rel
+        let image = getMeta('og:image') ||
+            getMeta('twitter:image') ||
+            $('link[rel="image_src"]').attr('href');
+
         let rawPrice = getMeta('product:price:amount') || getMeta('og:price:amount');
         let currency = getMeta('product:price:currency') || getMeta('og:price:currency') || 'TRY';
 
+        // 2. JSON-LD Extraction (High Quality Data)
+        try {
+            $('script[type="application/ld+json"]').each((i, el) => {
+                const jsonText = $(el).html();
+                if (!jsonText) return;
+                const json = JSON.parse(jsonText);
+                const data = Array.isArray(json) ? json.find(i => i['@type'] === 'Product') : (json['@type'] === 'Product' ? json : null);
+
+                if (data) {
+                    if (data.name) title = data.name;
+                    if (data.description) description = data.description;
+
+                    // Handle complex JSON-LD Image structures
+                    if (data.image) {
+                        const imgs = Array.isArray(data.image) ? data.image : [data.image];
+                        // Find first valid string or object with url
+                        const validImg = imgs.find(img => typeof img === 'string' || (img && img.url));
+                        if (validImg) {
+                            // If it's an object, prefer .url, otherwise use the string
+                            const newImg = typeof validImg === 'object' ? validImg.url : validImg;
+                            if (newImg) image = newImg;
+                        }
+                    }
+
+                    const offer = Array.isArray(data.offers) ? data.offers[0] : data.offers;
+                    if (offer) {
+                        if (offer.price) rawPrice = offer.price.toString();
+                        if (offer.priceCurrency) currency = offer.priceCurrency;
+                    }
+                }
+            });
+        } catch (e) {
+            // JSON-LD failed, persist with meta tags
+        }
+
+        // 3. DOM Fallbacks (If still missing)
         if (!rawPrice) {
-            const txt = $('.price, .product-price, .a-price-whole').first().text().trim();
+            const txt = $('.price, .product-price, .a-price-whole, .price-box__price').first().text().trim();
             if (txt) rawPrice = txt;
+        }
+
+        // Heuristic: Try to find the main product image by common IDs/Classes
+        if (!image) {
+            const possibleImg = $('#landingImage, #imgBlkFront, #main-image, .product-image-main, .gallery-image, img[itemprop="image"]').first().attr('src');
+            if (possibleImg) image = possibleImg;
+        }
+
+        // 4. Normalize Data
+        // Fix relative image URLs
+        if (image && image.startsWith('/')) {
+            try {
+                image = new URL(image, url).href;
+            } catch (e) { /* ignore invalid URL */ }
         }
 
         const price = parsePrice(rawPrice, currency);
         const sourceSite = new URL(url).hostname.replace('www.', '');
+
         return { title: title.trim(), imageUrl: image, description: description.trim(), price, currency, sourceSite, url };
     } catch (error) {
         Logger.error("SCRAPE_ERROR", error);
@@ -278,22 +335,74 @@ app.post('/api/ai/reaction', async (req, res) => {
     }
 });
 
-// 6. AI Moodboard
+async function urlToGenerativePart(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) return null;
+        const arrayBuffer = await response.arrayBuffer();
+        return {
+            inlineData: {
+                data: Buffer.from(arrayBuffer).toString("base64"),
+                mimeType: response.headers.get("content-type") || "image/jpeg",
+            },
+        };
+    } catch (e) {
+        Logger.warn("IMAGE_FETCH_FAIL", { url });
+        return null;
+    }
+}
+
+// 6. AI Moodboard (Now Multimodal!)
 app.post('/api/ai/moodboard', async (req, res) => {
     Logger.metric('ai_moodboard_request');
     try {
-        const { title, existingPins } = req.body;
+        const { title, existingPins } = req.body; // existingPins is array of objects { imageUrl: ... }
         if (!genAI) return res.status(503).json({ error: 'AI unavailable' });
+
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const prompt = `
-            Act as a creative design assistant.
-            Context: Moodboard titled "${title}". Existing Pins: ${existingPins?.length || 0}.
-            Task: Suggest 3-4 specific product types that would match this vibe perfectly.
-            Output strict JSON only. JSON: { "suggestions": [{ "name": "String", "why": "String" }] }
+
+        // 1. Prepare Text Prompt
+        let promptText = `
+            Act as a high-end interior designer and fashion stylist.
+            Analyze this Moodboard titled: "${title}".
+            
+            Task:
+            1. Describe the aesthetic/vibe in 3 words (e.g. "Minimalist, Earthy, Warm").
+            2. Suggest 3-4 specific product TYPES that would fit this aesthetic perfectly.
+            3. Briefly explain WHY they fit.
+            
+            Output strict JSON only. No markdown. 
+            JSON: { "aesthetic": "String", "suggestions": [{ "name": "String", "why": "String" }] }
         `;
-        const result = await model.generateContent(prompt);
+
+        // 2. Prepare Images (Multimodal)
+        const imageParts = [];
+        if (existingPins && existingPins.length > 0) {
+            // Take last 3 pins to avoid overloading payload/latency
+            const recentPins = existingPins.slice(-3);
+            Logger.info("AI_MOODBOARD_FETCHING_IMAGES", { count: recentPins.length });
+
+            const promises = recentPins.map(pin =>
+                pin.imageUrl ? urlToGenerativePart(pin.imageUrl) : null
+            );
+
+            const results = await Promise.all(promises);
+            results.forEach(part => {
+                if (part) imageParts.push(part);
+            });
+        }
+
+        // 3. Generate
+        // Gemini accepts [text, ...images]
+        const content = [promptText, ...imageParts];
+
+        const result = await model.generateContent(content);
         res.json(cleanAndParseJSON(result.response.text()));
-    } catch (e) { Logger.error("AI_MOODBOARD_FAIL", e); res.status(500).json({ error: e.message }); }
+
+    } catch (e) {
+        Logger.error("AI_MOODBOARD_FAIL", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // 7. AI Compatibility
@@ -302,19 +411,36 @@ app.post('/api/ai/compatibility', async (req, res) => {
     try {
         const { userItems, friendItems, names } = req.body;
         if (!genAI) return res.status(503).json({ error: 'AI unavailable' });
+
+        // [CHANGE] Extract relevant text data instead of just counts
+        const simplify = (items) => (items || []).slice(0, 50).map(i => `${i.title} (${i.category || 'General'})`);
+        const userList = simplify(userItems);
+        const friendList = simplify(friendItems);
+
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const prompt = `
             Act as a fun, matchmaking friend.
             Analyze compatibility based on wishlists.
-            Person A (${names.user}) items: ${userItems.length}.
-            Person B (${names.friend}) items: ${friendItems.length}.
             
-            Task: Give a fun score and a cheerful summary of their shared vibe.
-            Output strict JSON only. JSON: { "summary": "String", "score": Number, "sharedInterests": ["Tag1"] }
+            ${names.user}'s Wishlist: ${JSON.stringify(userList)}
+            ${names.friend}'s Wishlist: ${JSON.stringify(friendList)}
+            
+            Task: 
+            1. Identify shared interests, aesthetic overlaps, or complementary vibes.
+            2. Give a fun "Compatibility Score" (0-100%).
+            3. Write a cheerful summary (max 2 sentences) explaining why they click.
+            4. Extract 3-5 short "Shared Interest" tags (e.g. "Tech Geeks", "Cozy Home").
+            
+            Output strict JSON only. No markdown. 
+            JSON: { "summary": "String", "score": Number, "sharedInterests": ["Tag1", "Tag2"] }
         `;
+
         const result = await model.generateContent(prompt);
         res.json(cleanAndParseJSON(result.response.text()));
-    } catch (e) { Logger.error("AI_COMPATIBILITY_FAIL", e); res.status(500).json({ error: e.message }); }
+    } catch (e) {
+        Logger.error("AI_COMPATIBILITY_FAIL", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // 8. PRICE REFRESH JOB

@@ -3,30 +3,224 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WishOne</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WishOne — Curate your life.</title>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3781669118065797"
+        crossorigin="anonymous"></script>
 
-    <link rel="icon" type="image/jpeg" href="img/icon.png">
-    <link rel="apple-touch-icon" href="img/icon.png">
+    <link rel="icon" type="image/jpeg" href="/img/icon.png">
 
-    <link rel="stylesheet" href="css/variables.css">
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="/css/variables.css">
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/components.css">
 
+    <style>
+        /* Specific Landing Page Styles */
+        body {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow: hidden;
+            /* No scroll */
+        }
+
+        .landing-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 1;
+        }
+
+        .landing-card {
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            padding: 60px 40px;
+            animation: fadeUp 1s var(--ease-ios);
+        }
+
+        .logo-area {
+            margin-bottom: 24px;
+        }
+
+        .landing-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            margin: 0;
+            background: linear-gradient(135deg, #1D1D1F 0%, #555 100%);
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .landing-subtitle {
+            font-size: 1rem;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .tagline {
+            font-size: 1.2rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            margin: 24px 0 16px;
+            line-height: 1.4;
+        }
+
+        .description {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+
+        /* Disabled Button Style */
+        .btn-launching {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-secondary);
+            cursor: default;
+            box-shadow: none;
+            font-size: 0.9rem;
+            padding: 12px 32px;
+            pointer-events: none;
+            /* Not clickable */
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        /* Email Form (Visual Only for Beta) */
+        .notify-form {
+            display: flex;
+            gap: 8px;
+            margin-top: 24px;
+            justify-content: center;
+            opacity: 0.6;
+            /* Subtle look */
+            transition: opacity 0.3s;
+        }
+
+        .notify-form:hover {
+            opacity: 1;
+        }
+
+        .notify-input {
+            padding: 10px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            font-size: 0.9rem;
+            width: 200px;
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .notify-btn {
+            padding: 10px 20px;
+            font-size: 0.9rem;
+            background: var(--text-primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
+            z-index: 1;
+        }
+
+        .mascot-corner {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 60px;
+            height: 60px;
+            z-index: 10;
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            cursor: default;
+        }
+
+        .mascot-corner:hover {
+            transform: scale(1.1) rotate(5deg);
+        }
+
+        .mascot-corner img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.1));
+        }
+
+        /* Mobile Tweaks */
+        @media (max-width: 600px) {
+            .landing-card {
+                padding: 40px 24px;
+                width: 90%;
+            }
+
+            .landing-title {
+                font-size: 2rem;
+            }
+
+            .mascot-corner {
+                width: 48px;
+                height: 48px;
+                bottom: 16px;
+                left: 16px;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
     <div class="ambient-background"></div>
 
-    <main id="app">
-        <div
-            style="display: flex; justify-content: center; align-items: center; height: 100vh; color: var(--text-secondary);">
-            <h2>Loading...</h2>
-        </div>
-    </main>
+    <div class="landing-container">
+        <div class="glass-panel landing-card">
+            <div class="logo-area">
+                <img src="/img/icon.png" alt="WishOne Logo"
+                    style="width: 64px; height: 64px; border-radius: 16px; box-shadow: 0 10px 20px rgba(0,0,0,0.1);">
+            </div>
 
-    <script type="module" src="js/app.js"></script>
+            <h1 class="landing-title">WishOne</h1>
+            <div class="landing-subtitle">by AtOne</div>
+
+            <p class="tagline">
+                Curate your life. Manifest your dreams.<br>
+                Currently in private beta.
+            </p>
+
+            <p class="description">
+                WishOne is an AI-powered social wishlist designed to bring intention back to shopping.
+                We are currently in active development and accepting testers via invite only.
+            </p>
+
+            <button class="btn-primary btn-launching">
+                🚀 Launching Soon
+            </button>
+
+            <form class="notify-form"
+                onsubmit="event.preventDefault(); console.log('Email submitted:', this.querySelector('input').value); alert('Thanks for your interest!'); this.reset();">
+                <input type="email" class="notify-input" placeholder="Enter email for updates..." required>
+                <button type="submit" class="notify-btn">Notify Me</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="footer">
+        WishOne · An AtOne product · © 2025
+    </div>
+
+    <div class="mascot-corner" title="Working hard...">
+        <img src="/img/mascot/AtOneMonkeyThinkingIcon.png" alt="AtOne Monkey">
+    </div>
+
 </body>
 
 </html>

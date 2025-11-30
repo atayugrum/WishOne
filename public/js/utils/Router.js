@@ -4,17 +4,32 @@ export class Router {
     constructor(routes) {
         this.routes = routes;
         this.appContainer = document.getElementById('app');
+        this.guard = null; // [NEW] Guard function
 
         // Bind navigation events
         window.addEventListener('hashchange', () => this.handleLocation());
         window.addEventListener('DOMContentLoaded', () => this.handleLocation());
     }
 
+    // [NEW] Set a guard function that returns a redirect path or null
+    setGuard(guardFn) {
+        this.guard = guardFn;
+    }
+
     async handleLocation() {
-        // 1. Get current hash (default to home)
-        // Support query params: #/share?uid=xyz -> path: /share, params: {uid: xyz}
+        // 1. Get current hash
         const fullHash = window.location.hash.slice(1) || '/';
         const [path, queryString] = fullHash.split('?');
+
+        // [NEW] 1.5 Run Guard Check
+        if (this.guard) {
+            const redirectPath = this.guard(path);
+            if (redirectPath && redirectPath !== path) {
+                console.log(`[Router] Guard redirecting from ${path} to ${redirectPath}`);
+                window.location.hash = '#' + redirectPath;
+                return; // Stop rendering, wait for hashchange
+            }
+        }
 
         // Parse Query Params
         const params = {};
@@ -30,30 +45,24 @@ export class Router {
         // 3. Fluid Transition: Fade Out
         this.appContainer.classList.add('view-exit');
 
-        // Wait for CSS transition (matches --duration-std)
         setTimeout(async () => {
             // 4. Render New View
-            // Pass params to the render function
             const viewContent = typeof route.render === 'function'
                 ? await route.render(params)
                 : route.template;
 
             this.appContainer.innerHTML = viewContent;
 
-            // 4.5. Call afterRender hook
             if (route.afterRender && typeof route.afterRender === 'function') {
                 await route.afterRender(params);
             }
 
-            // 5. Update Active State
             document.dispatchEvent(new CustomEvent('route-changed', { detail: { route: path } }));
 
-            // 6. Fluid Transition: Fade In
             window.scrollTo(0, 0);
             this.appContainer.classList.remove('view-exit');
             this.appContainer.classList.add('view-enter');
 
-            // Cleanup animation class
             setTimeout(() => {
                 this.appContainer.classList.remove('view-enter');
             }, 300);

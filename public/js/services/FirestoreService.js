@@ -1,4 +1,3 @@
-// js/services/FirestoreService.js
 import { db } from '../config/firebase-config.js';
 import {
     collection,
@@ -14,7 +13,7 @@ import {
     serverTimestamp,
     orderBy,
     limit,
-    writeBatch
+    writeBatch // [NEW] Added writeBatch
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 export class FirestoreService {
@@ -79,19 +78,36 @@ export class FirestoreService {
         } catch (e) { return []; }
     }
 
-    // 1. Get Wishlist
+    // 1. Get Wishlist (Privacy Aware)
+    async checkIsFriend(ownerId, viewerId) {
+        if (!viewerId) return false;
+        if (ownerId === viewerId) return true;
+        try {
+            const friendRef = doc(db, "users", ownerId, "friends", viewerId);
+            const snap = await getDoc(friendRef);
+            return snap.exists();
+        } catch (e) {
+            console.error("Friend check error:", e);
+            return false;
+        }
+    }
+
     async getWishlist(userId, viewerId = null) {
         try {
             const q = query(this.itemsCollection, where("ownerId", "==", userId), where("isOwned", "==", false));
             const querySnapshot = await getDocs(q);
             let items = querySnapshot.docs.map(doc => this._transformItem(doc));
-            if (userId !== viewerId) {
-                items = items.filter(item => {
-                    if (item.visibility === 'private') return false;
-                    return true;
-                });
-            }
-            return items;
+
+            if (userId === viewerId) return items;
+
+            const isFriend = await this.checkIsFriend(userId, viewerId);
+
+            return items.filter(item => {
+                const vis = item.visibility || 'public';
+                if (vis === 'private') return false;
+                if (vis === 'friends') return isFriend;
+                return true;
+            });
         } catch (error) { throw error; }
     }
 
@@ -121,25 +137,93 @@ export class FirestoreService {
         await deleteDoc(itemRef);
     }
 
-    // 4. FRIEND MANAGEMENT
-    async addFriend(myUid, friendEmail) {
+    // 4. FRIEND MANAGEMENT (REFACTORED)
+
+    // [NEW] Send Request
+    async sendFriendRequest(myUid, friendEmail) {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("email", "==", friendEmail));
         const querySnapshot = await getDocs(q);
+
         if (querySnapshot.empty) throw new Error("User not found.");
+
         const friendDoc = querySnapshot.docs[0];
         const friendId = friendDoc.id;
-        const friendData = friendDoc.data();
+
         if (friendId === myUid) throw new Error("Cannot add yourself.");
-        const myFriendRef = doc(db, "users", myUid, "friends", friendId);
-        await setDoc(myFriendRef, { uid: friendId, email: friendData.email, displayName: friendData.displayName || "Friend", avatarUrl: friendData.avatarUrl || null, addedAt: serverTimestamp() });
+
+        // Check existing friendship
+        const existingFriend = await getDoc(doc(db, "users", myUid, "friends", friendId));
+        if (existingFriend.exists()) throw new Error("Already friends.");
+
+        // Check pending request (Outgoing)
+        const outgoingReq = await getDoc(doc(db, "users", friendId, "friend_requests", myUid));
+        if (outgoingReq.exists()) throw new Error("Request already sent.");
+
+        // Check pending request (Incoming - edge case, just accept it?)
+        // For simplicity, we just block double requests.
+
         const myProfile = await this.getUserProfile(myUid);
-        const theirFriendRef = doc(db, "users", friendId, "friends", myUid);
-        await setDoc(theirFriendRef, { uid: myUid, email: myProfile.email, displayName: myProfile.displayName, avatarUrl: myProfile.avatarUrl || null, addedAt: serverTimestamp() });
-        this.addActivity(myUid, 'friend_add', { name: friendData.displayName });
-        return friendData;
+
+        // Write to Recipient's subcollection
+        await setDoc(doc(db, "users", friendId, "friend_requests", myUid), {
+            fromUid: myUid,
+            fromName: myProfile.displayName,
+            fromEmail: myProfile.email,
+            fromPhoto: myProfile.photoURL,
+            timestamp: serverTimestamp()
+        });
+
+        return friendDoc.data();
     }
 
+    // [NEW] Get Requests
+    async getIncomingRequests(userId) {
+        const q = query(collection(db, "users", userId, "friend_requests"), orderBy("timestamp", "desc"));
+        const snap = await getDocs(q);
+        return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    }
+
+    // [NEW] Accept Request
+    async acceptFriendRequest(myUid, senderUid) {
+        const senderProfile = await this.getUserProfile(senderUid);
+        const myProfile = await this.getUserProfile(myUid);
+        const batch = writeBatch(db);
+
+        // 1. Add Sender to My Friends
+        const myFriendRef = doc(db, "users", myUid, "friends", senderUid);
+        batch.set(myFriendRef, {
+            uid: senderUid,
+            email: senderProfile.email,
+            displayName: senderProfile.displayName,
+            avatarUrl: senderProfile.photoURL,
+            addedAt: serverTimestamp()
+        });
+
+        // 2. Add Me to Sender's Friends
+        const theirFriendRef = doc(db, "users", senderUid, "friends", myUid);
+        batch.set(theirFriendRef, {
+            uid: myUid,
+            email: myProfile.email,
+            displayName: myProfile.displayName,
+            avatarUrl: myProfile.avatarUrl,
+            addedAt: serverTimestamp()
+        });
+
+        // 3. Delete Request
+        const reqRef = doc(db, "users", myUid, "friend_requests", senderUid);
+        batch.delete(reqRef);
+
+        await batch.commit();
+        this.addActivity(myUid, 'friend_add', { name: senderProfile.displayName });
+    }
+
+    // [NEW] Reject Request
+    async rejectFriendRequest(myUid, senderUid) {
+        await deleteDoc(doc(db, "users", myUid, "friend_requests", senderUid));
+    }
+
+    // Get Friends List
     async getFriends(userId) {
         const friendsRef = collection(db, "users", userId, "friends");
         const snap = await getDocs(friendsRef);
@@ -197,7 +281,6 @@ export class FirestoreService {
     async unmarkOwned(itemId) {
         const itemRef = doc(db, 'items', itemId);
         const snap = await getDoc(itemRef);
-        // Log "moved back" action
         if (snap.exists()) {
             this.addActivity(snap.data().ownerId, 'return_wish', { title: snap.data().title });
         }

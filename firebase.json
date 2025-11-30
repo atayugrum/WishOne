@@ -10,6 +10,14 @@
       {
         "source": "/api/**",
         "function": "api"
+      },
+      {
+        "source": "/lab",
+        "destination": "/app.html"
+      },
+      {
+        "source": "/lab/**",
+        "destination": "/app.html"
       }
     ]
   },

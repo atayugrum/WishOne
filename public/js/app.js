@@ -14,6 +14,7 @@ import { authService } from './services/AuthService.js';
 import { LogService } from './services/LogService.js';
 import { AICompanion } from './components/AICompanion.js';
 import { aiService } from './services/AIService.js';
+import './utils/Toast.js';
 
 const routes = {
     '/': HomeView,
@@ -21,7 +22,7 @@ const routes = {
     '/onboarding': OnboardingView,
     '/friends': FriendsView,
     '/friend-wishlist': FriendWishlistView,
-    '/share': PublicWishlistView,
+    '/share': PublicWishlistView, // Public Route
     '/inspo': InspoView,
     '/closet': ClosetView,
     '/combos': ComboView,
@@ -38,57 +39,75 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const router = new Router(routes);
 
-    // SAFETY FALLBACK: If stuck on "Loading..." for >3s, force Welcome screen.
+    // Timeout fallback (kept as safety net)
     const authTimeout = setTimeout(() => {
         const app = document.getElementById('app');
         if (app && app.innerText.includes('Loading...')) {
             console.warn("Auth check timed out. Forcing Welcome View.");
             window.location.hash = '#/welcome';
-            router.handleLocation();
+            router.handleLocation(); // Guard will re-check anyway
         }
     }, 3000);
 
-    authService.init((user, profile) => {
-        clearTimeout(authTimeout); // Cancel fallback if auth loads in time
+    // [NEW] Centralized Route Guard Logic
+    const routeGuard = (path, user, profile) => {
+        // 1. PUBLIC ROUTES (Always accessible)
+        // /share is public (read-only wishlist)
+        if (path.startsWith('/share')) return null;
 
-        if (window.location.hash.startsWith('#/share')) {
-            if (user) header.updateUser(user);
-            router.handleLocation();
-            return;
+        // 2. STATE: GUEST (No User)
+        if (!user) {
+            // Guests can ONLY see /welcome
+            if (path === '/welcome') return null;
+            return '/welcome';
         }
 
+        // 3. STATE: INCOMPLETE (User exists, profile incomplete)
+        // Gate: profileComplete property
+        if (profile && !profile.isProfileComplete) {
+            // Can ONLY see /onboarding (mapped from /complete-profile)
+            if (path === '/onboarding') return null;
+            return '/onboarding';
+        }
+
+        // 4. STATE: COMPLETE (User exists, profile complete)
+        // Cannot see /welcome or /onboarding
+        if (path === '/welcome' || path === '/onboarding') {
+            return '/';
+        }
+
+        // Otherwise allow (Home, Friends, etc.)
+        return null;
+    };
+
+    authService.init((user, profile) => {
+        clearTimeout(authTimeout);
+
+        // Update UI State
         if (user) {
-            // Milestone 1: Critical Registration Flow Check
+            header.updateUser(user);
+            // Hide header only on onboarding to focus user
             if (profile && !profile.isProfileComplete) {
                 header.hide();
-                if (window.location.hash !== '#/onboarding') {
-                    window.location.hash = '#/onboarding';
-                }
-                router.handleLocation();
-                return;
+            } else {
+                header.show();
             }
-
-            header.updateUser(user);
-            header.show();
-
-            if (window.location.hash === '#/welcome' || window.location.hash === '#/onboarding') {
-                window.location.hash = '#/';
-            }
-
-            if (window.location.hash === '#/' || window.location.hash === '') {
-                setTimeout(() => {
-                    aiService.triggerReaction('login', { name: user.displayName || 'Dreamer' });
-                }, 1000);
-            }
-
-            router.handleLocation();
         } else {
             header.hide();
-            if (window.location.hash !== '#/welcome') {
-                window.location.hash = '#/welcome';
-            }
-            router.handleLocation();
         }
+
+        // Trigger AI reaction on Login (only if complete and hitting home)
+        if (user && profile && profile.isProfileComplete && (window.location.hash === '#/' || window.location.hash === '')) {
+            setTimeout(() => {
+                aiService.triggerReaction('login', { name: user.displayName || 'Dreamer' });
+            }, 1000);
+        }
+
+        // [NEW] Update Router Guard with fresh state
+        router.setGuard((path) => routeGuard(path, user, profile));
+
+        // Re-evaluate current location with new guard
+        router.handleLocation();
     });
 
     window.addEventListener('offline', () => {

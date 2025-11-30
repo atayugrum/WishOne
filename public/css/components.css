@@ -1509,3 +1509,58 @@ select:focus {
 .toggle-switch-label input:checked+.toggle-slider:before {
     transform: translateX(20px);
 }
+
+.toast-notification {
+    position: fixed;
+    top: -100px;
+    /* Start hidden above screen */
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10000;
+    /* Top of everything */
+
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 4px 8px rgba(0, 0, 0, 0.05);
+
+    padding: 12px 24px;
+    border-radius: 100px;
+    /* Pill shape */
+
+    display: flex;
+    align-items: center;
+    gap: 12px;
+
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+
+    transition: top 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    /* Spring-like entry */
+    pointer-events: none;
+    /* Don't block clicks */
+}
+
+.toast-notification.visible {
+    top: 24px;
+    /* Slide down to visible area */
+}
+
+.toast-icon {
+    font-size: 1.2rem;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.toast-message {
+    white-space: nowrap;
+}
+
+/* Dark mode / Love mode adjustments if needed */
+body.mode-love .toast-notification {
+    background: rgba(255, 245, 247, 0.95);
+    color: #4A2C2C;
+}
