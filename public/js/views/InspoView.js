@@ -5,10 +5,10 @@ import { premiumModal } from '../components/PremiumModal.js';
 import { FEATURES } from '../config/limits.js';
 import { i18n } from '../services/LocalizationService.js';
 import { aiService } from '../services/AIService.js';
-import { AddItemModal } from '../components/addItemModal.js'; // [NEW]
+import { AddItemModal } from '../components/addItemModal.js';
 
 let activeBoard = null;
-let addItemModal = null; // [NEW]
+let addItemModal = null;
 
 export const InspoView = {
     render: async () => {
@@ -25,11 +25,32 @@ export const InspoView = {
                 <p>${i18n.t('inspo.subtitle')}</p>
             </div>
             <div id="boards-container" class="boards-grid">
-                <div class="glass-panel board-card create-card" id="btn-create-board">
+                <div class="glass-panel board-card create-card" id="btn-create-board-trigger">
                     <div class="board-cover dashed-cover">+</div>
                     <div class="board-info"><h3>${i18n.t('inspo.create')}</h3></div>
                 </div>
                 <div class="loading-spinner">${i18n.t('common.loading')}</div>
+            </div>
+
+            <div id="create-board-modal" class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header"><h3>${i18n.t('inspo.create')}</h3><button class="close-btn close-create-board">&times;</button></div>
+                    <form id="create-board-form">
+                        <div class="form-group">
+                            <label>Title</label>
+                            <input type="text" name="title" required placeholder="Summer Vibes">
+                        </div>
+                        <div class="form-group">
+                            <label>Privacy</label>
+                            <select name="privacy">
+                                <option value="private">🔒 Private</option>
+                                <option value="friends">👥 Friends Only</option>
+                                <option value="public">🌍 Public / Unlisted</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn-primary" style="width:100%;">Create Board</button>
+                    </form>
+                </div>
             </div>
         `;
     },
@@ -38,7 +59,6 @@ export const InspoView = {
         const user = authService.currentUser;
         if (!user) return;
 
-        // [NEW] Initialize Add Item Modal for "Make Wish" flow
         if (!addItemModal) addItemModal = new AddItemModal(() => {
             window.showToast(i18n.t('common.success'), "✨");
         });
@@ -46,17 +66,44 @@ export const InspoView = {
         // --- BOARD LIST LOGIC ---
         if (!activeBoard) {
             const container = document.getElementById('boards-container');
-            const createBtn = document.getElementById('btn-create-board');
+            const createBtnTrigger = document.getElementById('btn-create-board-trigger');
+            const createModal = document.getElementById('create-board-modal');
+            const createForm = document.getElementById('create-board-form');
 
-            if (createBtn) {
-                createBtn.addEventListener('click', async () => {
-                    const title = prompt(i18n.t('inspo.create'));
-                    if (title) {
-                        await firestoreService.createBoard(user.uid, title, null);
-                        aiService.triggerReaction('create_board', { title: title });
-                        InspoView.refresh();
-                    }
+            // Open Modal
+            if (createBtnTrigger) {
+                createBtnTrigger.addEventListener('click', () => {
+                    createModal.style.display = 'flex';
+                    requestAnimationFrame(() => createModal.classList.add('active'));
                 });
+            }
+
+            // Close Modal
+            document.querySelectorAll('.close-create-board').forEach(el => {
+                el.onclick = () => {
+                    createModal.classList.remove('active');
+                    setTimeout(() => createModal.style.display = 'none', 300);
+                }
+            });
+
+            // Handle Create
+            if (createForm) {
+                createForm.onsubmit = async (e) => {
+                    e.preventDefault();
+                    const formData = new FormData(createForm);
+                    const title = formData.get('title');
+                    const privacy = formData.get('privacy');
+
+                    try {
+                        await firestoreService.createBoard(user.uid, title, null, privacy);
+                        aiService.triggerReaction('create_board', { title: title });
+                        createModal.classList.remove('active');
+                        setTimeout(() => createModal.style.display = 'none', 300);
+                        InspoView.refresh();
+                    } catch (err) {
+                        alert("Error creating board.");
+                    }
+                };
             }
 
             try {
@@ -65,21 +112,22 @@ export const InspoView = {
                 const boardCards = boards.map(board => `
                     <div class="glass-panel board-card" data-id="${board.id}">
                         <div class="board-cover" style="background-image: url('${board.coverUrl}')"></div>
-                        <div class="board-info"><h3>${board.title}</h3></div>
+                        <div class="board-info">
+                            <div style="display:flex; justify-content:space-between;">
+                                <h3>${board.title}</h3>
+                                <span style="font-size:0.8rem; opacity:0.6;">${board.privacy === 'private' ? '🔒' : (board.privacy === 'friends' ? '👥' : '🌍')}</span>
+                            </div>
+                        </div>
                     </div>
                 `).join('');
 
-                if (container && createBtn) {
-                    container.innerHTML = createBtn.outerHTML + boardCards;
+                if (container && createBtnTrigger) {
+                    container.innerHTML = createBtnTrigger.outerHTML + boardCards;
 
-                    // Re-bind Create Button (lost on innerHTML overwrite)
-                    document.getElementById('btn-create-board').addEventListener('click', async () => {
-                        const title = prompt(i18n.t('inspo.create'));
-                        if (title) {
-                            await firestoreService.createBoard(user.uid, title, null);
-                            aiService.triggerReaction('create_board', { title: title });
-                            InspoView.refresh();
-                        }
+                    // Re-bind Trigger
+                    document.getElementById('btn-create-board-trigger').addEventListener('click', () => {
+                        createModal.style.display = 'flex';
+                        requestAnimationFrame(() => createModal.classList.add('active'));
                     });
                 }
 
@@ -93,17 +141,11 @@ export const InspoView = {
                     });
                 });
 
-                if (boards.length === 0 && window.aiCompanion) {
-                    window.aiCompanion.say("Start your first moodboard here.", "presenting");
-                }
-
             } catch (e) { console.error(e); }
             return;
         }
 
         // --- BOARD DETAIL LOGIC ---
-
-        // Static Bindings
         const backBtn = document.getElementById('btn-back-boards');
         const settingsBtn = document.getElementById('btn-board-settings');
         const aiBtn = document.getElementById('btn-ai-vibe');
@@ -118,6 +160,9 @@ export const InspoView = {
             settingsModal.classList.add('active');
             document.getElementById('board-title-input').value = activeBoard.title;
             document.getElementById('board-cover-input').value = activeBoard.coverUrl;
+            // Select privacy
+            const privacySelect = document.getElementById('board-privacy-input');
+            if (privacySelect) privacySelect.value = activeBoard.privacy || 'private';
         };
 
         const openAddModal = () => {
@@ -130,40 +175,32 @@ export const InspoView = {
 
         if (fabAdd) fabAdd.onclick = openAddModal;
 
-        // Fetch Data
         const [pins, wishlist, closet] = await Promise.all([
             firestoreService.getPins(activeBoard.id),
             firestoreService.getWishlist(user.uid, user.uid),
             firestoreService.getCloset(user.uid)
         ]);
 
-        // Render Pins with "Make Wish" Button
         const pinsGrid = document.getElementById('pins-grid');
         if (pinsGrid) {
             if (pins.length > 0) {
                 pinsGrid.innerHTML = pins.map(pin => `
                     <div class="pin-item glass-panel" style="position:relative; overflow:hidden; border-radius:12px; margin-bottom:16px; break-inside: avoid;">
                         <img src="${pin.imageUrl}" loading="lazy" style="width:100%; display:block;">
-                        
                         <div class="pin-actions" style="position:absolute; top:10px; right:10px; opacity:0; transition:0.2s; display:flex; gap:8px;">
                              <button class="icon-btn btn-make-wish" data-img="${pin.imageUrl}" title="Make Wish" style="background:rgba(255,255,255,0.9); border-radius:50%; width:36px; height:36px; font-size:1rem; box-shadow:0 4px 10px rgba(0,0,0,0.1);">✨</button>
                         </div>
                     </div>
                 `).join('');
 
-                // Styles for hover effect
                 const style = document.createElement('style');
                 style.innerHTML = `.pin-item:hover .pin-actions { opacity: 1; }`;
                 document.head.appendChild(style);
 
-                // Bind Make Wish
                 pinsGrid.querySelectorAll('.btn-make-wish').forEach(btn => {
                     btn.onclick = (e) => {
                         e.stopPropagation();
-                        const imgUrl = btn.dataset.img;
-                        // Open Add Item Modal with this image
-                        addItemModal.open({ imageUrl: imgUrl, title: '', price: '' });
-                        // Optional: Trigger AI Magic to fill details from image? (Future)
+                        addItemModal.open({ imageUrl: btn.dataset.img, title: '', price: '' });
                     };
                 });
 
@@ -177,9 +214,6 @@ export const InspoView = {
                 document.getElementById('btn-empty-add').onclick = openAddModal;
             }
         }
-
-        // [REST OF THE FILE REMAINS THE SAME: Modal Logic, Edit Board, etc.]
-        // ... (Copying previous logic for addPin, editBoard, AI, etc.) ...
 
         const pinContainer = document.getElementById('pin-selection-grid');
         const urlContainer = document.getElementById('pin-url-input-container');
@@ -247,9 +281,14 @@ export const InspoView = {
                 e.preventDefault();
                 const newTitle = document.getElementById('board-title-input').value;
                 const newCover = document.getElementById('board-cover-input').value;
-                await firestoreService.updateBoard(activeBoard.id, { title: newTitle, coverUrl: newCover });
+                const newPrivacy = document.getElementById('board-privacy-input').value;
+
+                await firestoreService.updateBoard(activeBoard.id, { title: newTitle, coverUrl: newCover, privacy: newPrivacy });
+
                 activeBoard.title = newTitle;
                 activeBoard.coverUrl = newCover;
+                activeBoard.privacy = newPrivacy;
+
                 settingsModal.classList.remove('active');
                 InspoView.refresh();
             };
@@ -332,7 +371,7 @@ export const InspoView = {
                     <button class="btn-text" id="btn-back-boards" style="font-size: 1.5rem;">←</button>
                     <div>
                         <h1>${board.title} <button id="btn-board-settings" class="btn-text" style="font-size:1rem; opacity:0.5;">⚙️</button></h1>
-                        <p>${i18n.t('inspo.visual_board')}</p>
+                        <p>${i18n.t('inspo.visual_board')} <span style="font-size:0.8rem; margin-left:8px; opacity:0.6;">${board.privacy === 'private' ? '🔒 Private' : (board.privacy === 'friends' ? '👥 Friends' : '🌍 Public')}</span></p>
                     </div>
                 </div>
                 <button class="btn-magic" id="btn-ai-vibe">${i18n.t('inspo.ai_ideas')}</button>
@@ -358,6 +397,14 @@ export const InspoView = {
                                 <input type="file" id="board-cover-upload" accept="image/*" style="display:none;">
                                 <button type="button" class="btn-primary" id="btn-trigger-cover">📷</button>
                             </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Privacy</label>
+                            <select id="board-privacy-input">
+                                <option value="private">🔒 Private</option>
+                                <option value="friends">👥 Friends Only</option>
+                                <option value="public">🌍 Public / Unlisted</option>
+                            </select>
                         </div>
                         <button type="submit" class="btn-primary" style="width:100%;">${i18n.t('modal.save')}</button>
                     </form>

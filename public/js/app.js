@@ -11,6 +11,7 @@ import { ClosetView } from './views/ClosetView.js';
 import { ComboView } from './views/ComboView.js';
 import { ProfileView } from './views/ProfileView.js';
 import { authService } from './services/AuthService.js';
+import { firestoreService } from './services/FirestoreService.js';
 import { LogService } from './services/LogService.js';
 import { AICompanion } from './components/AICompanion.js';
 import { aiService } from './services/AIService.js';
@@ -22,7 +23,7 @@ const routes = {
     '/onboarding': OnboardingView,
     '/friends': FriendsView,
     '/friend-wishlist': FriendWishlistView,
-    '/share': PublicWishlistView, // Public Route
+    '/share': PublicWishlistView,
     '/inspo': InspoView,
     '/closet': ClosetView,
     '/combos': ComboView,
@@ -30,8 +31,51 @@ const routes = {
     '404': { template: '<h1>404 - Not Found</h1>' }
 };
 
+const checkReminders = async (user) => {
+    try {
+        const items = await firestoreService.getWishlist(user.uid, user.uid);
+        const now = new Date();
+        const threeDays = 3 * 24 * 60 * 60 * 1000;
+
+        let dueCount = 0;
+        let urgentItem = null;
+
+        items.forEach(item => {
+            if (item.targetDate && item.status === 'wish') {
+                const target = new Date(item.targetDate);
+                const diff = target - now;
+                if (diff > 0 && diff < threeDays) {
+                    dueCount++;
+                    urgentItem = item.title;
+                }
+            }
+        });
+
+        if (dueCount > 0) {
+            const msg = dueCount === 1
+                ? `Reminder: "${urgentItem}" is due soon!`
+                : `You have ${dueCount} wishes due soon!`;
+
+            setTimeout(() => {
+                window.showToast(msg, "⏰");
+                if (window.aiCompanion) window.aiCompanion.say(msg, "thinking");
+            }, 2000);
+        }
+    } catch (e) {
+        console.warn("Reminder check failed", e);
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     LogService.info('App Started');
+
+    // [NEW] Register SW
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js')
+            .then(() => console.log('SW registered'))
+            .catch(err => console.log('SW failed', err));
+    }
+
     const header = new Header();
     header.mount('body');
 
@@ -39,74 +83,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const router = new Router(routes);
 
-    // Timeout fallback (kept as safety net)
     const authTimeout = setTimeout(() => {
         const app = document.getElementById('app');
         if (app && app.innerText.includes('Loading...')) {
-            console.warn("Auth check timed out. Forcing Welcome View.");
             window.location.hash = '#/welcome';
-            router.handleLocation(); // Guard will re-check anyway
+            router.handleLocation();
         }
     }, 3000);
 
-    // [NEW] Centralized Route Guard Logic
     const routeGuard = (path, user, profile) => {
-        // 1. PUBLIC ROUTES (Always accessible)
-        // /share is public (read-only wishlist)
         if (path.startsWith('/share')) return null;
-
-        // 2. STATE: GUEST (No User)
         if (!user) {
-            // Guests can ONLY see /welcome
             if (path === '/welcome') return null;
             return '/welcome';
         }
-
-        // 3. STATE: INCOMPLETE (User exists, profile incomplete)
-        // Gate: profileComplete property
         if (profile && !profile.isProfileComplete) {
-            // Can ONLY see /onboarding (mapped from /complete-profile)
             if (path === '/onboarding') return null;
             return '/onboarding';
         }
-
-        // 4. STATE: COMPLETE (User exists, profile complete)
-        // Cannot see /welcome or /onboarding
         if (path === '/welcome' || path === '/onboarding') {
             return '/';
         }
-
-        // Otherwise allow (Home, Friends, etc.)
         return null;
     };
 
     authService.init((user, profile) => {
         clearTimeout(authTimeout);
 
-        // Update UI State
         if (user) {
             header.updateUser(user);
-            // Hide header only on onboarding to focus user
             if (profile && !profile.isProfileComplete) {
                 header.hide();
             } else {
                 header.show();
+                if (!window.hasCheckedReminders) {
+                    checkReminders(user);
+                    window.hasCheckedReminders = true;
+                }
             }
         } else {
             header.hide();
         }
 
-        // Trigger AI reaction on Login (only if complete and hitting home)
         if (user && profile && profile.isProfileComplete && (window.location.hash === '#/' || window.location.hash === '')) {
             setTimeout(() => {
                 aiService.triggerReaction('login', { name: user.displayName || 'Dreamer' });
             }, 1000);
         }
 
-        // [NEW] Update Router Guard with fresh state
         router.setGuard((path) => routeGuard(path, user, profile));
-
-        // Re-evaluate current location with new guard
         router.handleLocation();
     });
 

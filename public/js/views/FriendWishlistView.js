@@ -14,11 +14,11 @@ function getCountdown(dateString) {
     const diffTime = target - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    if (diffDays < 0) return { text: i18n.t('time.overdue') || "Overdue", class: "tag-overdue", days: diffDays };
-    if (diffDays === 0) return { text: i18n.t('time.today') || "Today!", class: "tag-urgent", days: 0 };
-    if (diffDays <= 7) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-urgent", days: diffDays };
-    if (diffDays <= 30) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-soon", days: diffDays };
-    return { text: `${Math.round(diffDays / 30)} ${i18n.t('time.months') || "months"}`, class: "tag-far", days: diffDays };
+    if (diffDays < 0) return { text: i18n.t('time.overdue') || "Overdue", class: "tag-overdue" };
+    if (diffDays === 0) return { text: i18n.t('time.today') || "Today!", class: "tag-urgent" };
+    if (diffDays <= 7) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-urgent" };
+    if (diffDays <= 30) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-soon" };
+    return { text: `${Math.round(diffDays / 30)} ${i18n.t('time.months') || "months"}`, class: "tag-far" };
 }
 
 export const FriendWishlistView = {
@@ -34,38 +34,29 @@ export const FriendWishlistView = {
 
         const [friendProfile, items] = await Promise.all([
             firestoreService.getUserProfile(friendId),
-            firestoreService.getWishlist(friendId)
+            firestoreService.getWishlist(friendId, user.uid)
         ]);
 
         const friendName = friendProfile ? friendProfile.displayName : "Friend";
 
-        // Privacy Check
-        if (friendProfile && friendProfile.isPrivate) {
-            return `
-                <div class="view-header">
-                    <button class="btn-text" onclick="window.location.hash='#/friends'" style="margin-bottom:16px;">← ${i18n.t('common.back') || "Back"}</button>
-                </div>
-                <div class="glass-panel empty-state-card">
-                    <span class="empty-icon">🔒</span>
-                    <h3 class="empty-title">${i18n.t('friends.private_title') || "Private Wishlist"}</h3>
-                    <p class="empty-text">${friendName} ${i18n.t('friends.private_msg') || "has made their wishlist private."}</p>
-                </div>
-            `;
+        // Privacy Check (Should be handled by getWishlist, but double check)
+        if (items.length === 0 && friendProfile && friendProfile.isPrivate) {
+            // If getWishlist returns 0 and profile is private, likely strictly private
+            // But getWishlist now handles friend-logic, so if we see 0 it just means nothing to show
         }
 
         window.handleGiftItem = async (itemId, currentClaimedBy) => {
             const btn = document.querySelector(`[data-gift-btn="${itemId}"]`);
             const card = btn.closest('.card');
-            const isClaiming = !currentClaimedBy; 
+            const isClaiming = !currentClaimedBy;
             const originalBtnHTML = btn.innerHTML;
-            const originalCardClass = card.className;
-            const existingBadge = card.querySelector('.gift-badge');
 
             try {
+                // Optimistic UI Update
                 if (isClaiming) {
                     btn.innerHTML = "✅";
                     card.classList.add('card-gifted');
-                    if (!existingBadge) {
+                    if (!card.querySelector('.gift-badge')) {
                         const badge = document.createElement('div');
                         badge.className = 'gift-badge';
                         badge.innerText = i18n.t('friends.reserved_by_you') || 'Reserved by You';
@@ -79,6 +70,7 @@ export const FriendWishlistView = {
                     }
                     btn.innerHTML = "🎁";
                     card.classList.remove('card-gifted');
+                    const existingBadge = card.querySelector('.gift-badge');
                     if (existingBadge) existingBadge.remove();
                     btn.onclick = () => window.handleGiftItem(itemId, null);
                 }
@@ -86,8 +78,6 @@ export const FriendWishlistView = {
             } catch (error) {
                 console.error("Claim failed:", error);
                 alert(i18n.t('common.error'));
-                btn.innerHTML = originalBtnHTML;
-                card.className = originalCardClass;
                 window.location.reload();
             }
         };
@@ -101,7 +91,7 @@ export const FriendWishlistView = {
                 <div class="glass-panel empty-state-card">
                     <span class="empty-icon">📭</span>
                     <h3 class="empty-title">${i18n.t('friends.empty_title') || "Nothing Here Yet"}</h3>
-                    <p class="empty-text">${friendName} ${i18n.t('friends.empty_msg') || "hasn't added any wishes yet."}</p>
+                    <p class="empty-text">${friendName} has no visible wishes.</p>
                 </div>`;
         }
 
@@ -123,28 +113,28 @@ export const FriendWishlistView = {
                 btnClass += " disabled";
             }
 
-            const catConfig = CATEGORIES[item.category] || (item.category ? { icon:'✨', color:'#ccc' } : CATEGORIES['Other']);
-            const icon = catConfig ? catConfig.icon : '📦';
-            const subText = item.subcategory ? `• ${item.subcategory}` : '';
+            const catConfig = CATEGORIES[item.category] || CATEGORIES['Other'];
+            const icon = catConfig.icon || '📦';
             const claimArg = item.claimedBy ? `'${item.claimedBy}'` : 'null';
             const timeData = getCountdown(item.targetDate);
-            let timeBadge = '';
-            if (timeData) {
-                timeBadge = `<div class="card-overlay-badge"><span class="time-tag ${timeData.class}">⏳ ${timeData.text}</span></div>`;
-            }
+
+            // Badges
+            let badges = '';
+            if (timeData) badges += `<span class="time-tag ${timeData.class}">⏳ ${timeData.text}</span>`;
+            if (item.occasion) badges += `<span class="time-tag tag-far" style="margin-left:4px;">🎉 ${item.occasion}</span>`;
 
             return `
-                <article class="${cardClass}">
+                <article class="${cardClass}" style="position:relative;">
                     ${statusBadge}
                     <button class="${btnClass}" data-gift-btn="${item.id}" onclick="window.handleGiftItem('${item.id}', ${claimArg})">${btnIcon}</button>
                     <div class="card-img-container">
-                         ${timeBadge}
                          <img src="${item.imageUrl}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
                     </div>
                     <div class="card-content">
                         <h3>${item.title}</h3>
+                        <div style="margin-bottom:8px; display:flex; flex-wrap:wrap; gap:4px;">${badges}</div>
                         <div class="card-meta">
-                            <span class="tag">${icon} ${item.category || catConfig.label} ${subText}</span>
+                            <span class="tag">${icon} ${item.category || 'Item'}</span>
                             <span class="price">${item.price} ${item.currency}</span>
                         </div>
                     </div>

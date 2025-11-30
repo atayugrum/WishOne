@@ -1,81 +1,66 @@
-// js/views/PublicWishlistView.js
 import { firestoreService } from '../services/FirestoreService.js';
-import { CATEGORIES } from '../config/categories.js';
+import { i18n } from '../services/LocalizationService.js';
 
 export const PublicWishlistView = {
-    render: async (params) => {
-        const uid = params.uid;
+    render: async () => {
+        // Extract UID from URL: #/share?uid=XYZ
+        const params = new URLSearchParams(window.location.hash.split('?')[1]);
+        const targetUid = params.get('uid');
 
-        if (!uid) {
-            return `<div class="empty-state"><h3>Invalid Link</h3><p>No user specified.</p></div>`;
-        }
+        if (!targetUid) return `<div class="empty-state">Invalid Link.</div>`;
 
         try {
-            // Fetch User & Items
+            // Get profile and items
             const [profile, items] = await Promise.all([
-                firestoreService.getUserProfile(uid),
-                firestoreService.getWishlist(uid)
+                firestoreService.getUserProfile(targetUid),
+                firestoreService.getWishlist(targetUid, null) // Viewer ID is null (public)
             ]);
 
-            if (!profile) {
-                return `<div class="empty-state"><h3>User Not Found</h3></div>`;
-            }
+            if (!profile) return `<div class="empty-state">User not found.</div>`;
 
-            // Privacy Check
-            if (profile.isPrivate) {
+            // Filter out any archived items (just in case service returned them, though it shouldn't for public)
+            const activeItems = items.filter(i => i.status === 'wish');
+
+            if (activeItems.length === 0) {
                 return `
-                    <div class="view-container" style="text-align:center; padding-top:60px;">
-                        <div class="glass-panel empty-state-card">
-                            <span class="empty-icon">🔒</span>
-                            <h2 class="empty-title">Private Wishlist</h2>
-                            <p class="empty-text">@${profile.username || 'User'} has kept this list private.</p>
-                            <a href="#/welcome" class="btn-text">Join WishOne</a>
-                        </div>
-                    </div>
+                    <div class="view-header"><h1>${profile.displayName}'s Wishlist</h1></div>
+                    <div class="empty-state"><p>This list is empty or private.</p></div>
                 `;
             }
 
-            // Render Public Grid
-            const gridContent = items.length > 0
-                ? items.map(item => PublicWishlistView.renderCard(item)).join('')
-                : `<div class="empty-state"><p>${profile.displayName} hasn't added any wishes yet.</p></div>`;
+            const gridHtml = activeItems.map(item => `
+                <article class="glass-panel card">
+                    <div class="card-img-container">
+                        <img src="${item.imageUrl}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
+                    </div>
+                    <div class="card-content">
+                        <h3>${item.title}</h3>
+                        <div class="card-meta">
+                            <span class="tag">${item.category}</span>
+                            <span class="price">${item.price} ${item.currency}</span>
+                        </div>
+                        ${item.link ? `<a href="${item.link}" target="_blank" class="btn-primary" style="display:block; text-align:center; margin-top:12px; text-decoration:none; font-size:0.85rem;">View Store</a>` : ''}
+                    </div>
+                </article>
+            `).join('');
 
             return `
                 <div class="view-header" style="text-align:center;">
-                    <img src="${profile.photoURL}" style="width:80px; height:80px; border-radius:50%; margin-bottom:16px; border:3px solid white; box-shadow:0 10px 20px rgba(0,0,0,0.1);">
+                    <img src="${profile.photoURL}" style="width:80px; height:80px; border-radius:50%; margin-bottom:16px;">
                     <h1>${profile.displayName}'s Wishlist</h1>
-                    <p style="margin-bottom:24px;">Shared via WishOne</p>
-                    <a href="#/welcome" class="btn-primary" style="text-decoration:none; font-size:0.9rem;">✨ Create Your Own</a>
+                    <p>Curated on WishOne</p>
                 </div>
-                
-                <div class="masonry-grid">
-                    ${gridContent}
+                <div class="masonry-grid" style="margin-top:32px;">
+                    ${gridHtml}
+                </div>
+                <div style="text-align:center; margin-top:60px; padding-bottom:40px;">
+                    <a href="/" style="color:var(--accent-color); font-weight:600;">Create your own list on WishOne</a>
                 </div>
             `;
 
         } catch (error) {
-            console.error("Public View Error:", error);
-            return `<div class="empty-state"><h3>Error loading wishlist</h3></div>`;
+            console.error(error);
+            return `<div class="empty-state">This list is private.</div>`;
         }
-    },
-
-    renderCard: (item) => {
-        const catConfig = CATEGORIES[item.category] || CATEGORIES['Other'];
-        const icon = catConfig ? catConfig.icon : '📦';
-
-        return `
-            <article class="glass-panel card">
-                <div class="card-img-container">
-                    <img src="${item.imageUrl || 'https://placehold.co/600x400'}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
-                </div>
-                <div class="card-content">
-                    <h3>${item.title}</h3>
-                    <div class="card-meta">
-                        <span class="tag">${icon} ${item.category}</span>
-                        <span class="price">${item.price} ${item.currency}</span>
-                    </div>
-                </div>
-            </article>
-        `;
     }
 };

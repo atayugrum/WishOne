@@ -8,6 +8,7 @@ export class Header {
         this.element.style.display = 'none';
         this.render();
         this.bindEvents();
+        this.loadTheme(); // [NEW] Load saved theme
     }
 
     show() { this.element.style.display = 'flex'; }
@@ -35,7 +36,7 @@ export class Header {
                     ${currentLang}
                 </button>
 
-                <button id="toggle-love" class="icon-btn">❤️</button>
+                <button id="toggle-love" class="icon-btn" title="Toggle Theme">❤️</button>
                 <div id="auth-container"></div>
             </div>
         `;
@@ -48,6 +49,9 @@ export class Header {
 
         this.element.querySelector('#toggle-love').addEventListener('click', () => {
             document.body.classList.toggle('mode-love');
+            // [NEW] Persist choice
+            const isLove = document.body.classList.contains('mode-love');
+            localStorage.setItem('wishone_theme', isLove ? 'love' : 'default');
         });
 
         document.addEventListener('route-changed', (e) => {
@@ -65,6 +69,13 @@ export class Header {
                 window.location.hash = '#/profile';
             }
         });
+    }
+
+    loadTheme() {
+        const theme = localStorage.getItem('wishone_theme');
+        if (theme === 'love') {
+            document.body.classList.add('mode-love');
+        }
     }
 
     updateUser(user) {

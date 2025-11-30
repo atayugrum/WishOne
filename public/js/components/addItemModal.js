@@ -10,7 +10,7 @@ export class AddItemModal {
     constructor(onItemSaved) {
         this.onItemSaved = onItemSaved;
         this.overlay = null;
-        this.uploadedBase64 = null; // [NEW] Store base64 internally
+        this.uploadedBase64 = null;
         this.render();
     }
 
@@ -20,7 +20,6 @@ export class AddItemModal {
 
         const categoryGridHtml = Object.keys(CATEGORIES).map(key => {
             const cat = CATEGORIES[key];
-            // [CHANGE] Removed onclick="window..."
             return `<div class="cat-pill" data-cat="${key}"><span class="cat-icon">${cat.icon}</span><span class="cat-name">${cat.label}</span></div>`;
         }).join('');
 
@@ -114,6 +113,14 @@ export class AddItemModal {
                         <small id="file-name-display" style="display:none; color:var(--accent-color); margin-top:4px;"></small>
                         <div id="img-preview" style="width: 100%; height: 150px; margin-top: 10px; border-radius: 12px; background: #f0f0f0; background-size: cover; background-position: center; display: none; transition: background-image 0.3s;"></div>
                     </div>
+
+                    <div class="form-group" style="display:flex; align-items:center; justify-content:space-between; background:rgba(0,0,0,0.03); padding:12px; border-radius:12px;">
+                        <label style="margin:0; cursor:pointer;" for="check-owned">I already own this</label>
+                        <label class="toggle-switch-label">
+                            <input type="checkbox" name="isOwned" id="check-owned">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
                     
                     <div class="modal-actions">
                         <button type="button" class="btn-text close-trigger">${i18n.t('modal.cancel')}</button>
@@ -140,7 +147,6 @@ export class AddItemModal {
         const categoryGrid = this.overlay.querySelector('#category-grid');
         const occasionSelect = this.overlay.querySelector('#input-occasion');
 
-        // 1. Internal Logic Helpers
         const selectCategory = (key) => {
             const pills = this.overlay.querySelectorAll('.cat-pill');
             pills.forEach(p => p.classList.remove('selected'));
@@ -152,9 +158,6 @@ export class AddItemModal {
             this.overlay.querySelector('#custom-cat-container').style.display = key === 'Custom' ? 'block' : 'none';
         };
 
-        // 2. Event Listeners (No Global Pollution)
-
-        // Category Selection
         categoryGrid.addEventListener('click', (e) => {
             const pill = e.target.closest('.cat-pill');
             if (pill) {
@@ -162,27 +165,23 @@ export class AddItemModal {
             }
         });
 
-        // Occasion Change
         occasionSelect.addEventListener('change', (e) => {
             const customInput = document.getElementById('input-custom-occasion');
             customInput.style.display = e.target.value === 'Custom' ? 'block' : 'none';
         });
 
-        // Toggle Magic Container
         btnMagicAdd.onclick = () => {
             const isHidden = magicContainer.style.display === 'none';
             magicContainer.style.display = isHidden ? 'block' : 'none';
             if (isHidden) magicInput.focus();
         };
 
-        // Image Upload Handling
         btnUpload.onclick = () => imgUpload.click();
 
         imgUpload.onchange = (e) => {
             const file = e.target.files[0];
             if (file) {
-                // Check size (simple client-side check)
-                if (file.size > 1024 * 1024) { // 1MB limit for Firestore base64
+                if (file.size > 1024 * 1024) {
                     alert("Image too large. Please use a URL or an image under 1MB.");
                     imgUpload.value = '';
                     return;
@@ -190,11 +189,9 @@ export class AddItemModal {
 
                 const reader = new FileReader();
                 reader.onload = (ev) => {
-                    this.uploadedBase64 = ev.target.result; // Store internally
+                    this.uploadedBase64 = ev.target.result;
                     imgPreview.style.backgroundImage = `url('${this.uploadedBase64}')`;
                     imgPreview.style.display = 'block';
-
-                    // UX Update
                     imgInput.value = '';
                     imgInput.disabled = true;
                     imgInput.placeholder = "(Image File Selected)";
@@ -205,14 +202,11 @@ export class AddItemModal {
             }
         };
 
-        // URL Image Preview
         imgInput.addEventListener('input', () => {
             if (imgInput.value) {
-                // Reset upload state if user types URL
                 this.uploadedBase64 = null;
                 imgUpload.value = '';
                 fileNameDisplay.style.display = 'none';
-
                 imgPreview.style.display = 'block';
                 imgPreview.style.backgroundImage = `url('${imgInput.value}')`;
             } else if (!this.uploadedBase64) {
@@ -220,14 +214,12 @@ export class AddItemModal {
             }
         });
 
-        // Magic Fetch
         btnFetchMagic.addEventListener('click', async () => {
             if (!authService.canUseFeature(FEATURES.MAGIC_ADD)) { premiumModal.open(); return; }
 
             const url = magicInput.value.trim();
             if (!url) return;
 
-            // Reset UI
             document.getElementById('magic-error').style.display = 'none';
             document.getElementById('ai-insight-box').style.display = 'none';
             btnFetchMagic.innerHTML = `...`;
@@ -243,7 +235,6 @@ export class AddItemModal {
                 if (metaData.price !== null) this.overlay.querySelector('#input-price').value = metaData.price;
                 if (metaData.currency) this.overlay.querySelector('#input-currency').value = metaData.currency;
 
-                // Handle Image from AI
                 if (metaData.imageUrl) {
                     imgInput.value = metaData.imageUrl;
                     imgInput.dispatchEvent(new Event('input'));
@@ -278,12 +269,10 @@ export class AddItemModal {
             }
         });
 
-        // Close Handlers
         this.overlay.querySelectorAll('.close-btn, .close-trigger').forEach(btn =>
             btn.addEventListener('click', () => this.close())
         );
 
-        // Submit Handler
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = form.querySelector('button[type="submit"]');
@@ -300,11 +289,13 @@ export class AddItemModal {
                 occasion = document.getElementById('input-custom-occasion').value.trim();
             }
 
-            // Decide Image Source
             let finalImage = formData.get('imageUrl');
             if (this.uploadedBase64) {
                 finalImage = this.uploadedBase64;
             }
+
+            // [NEW] Handle manual closet entry
+            const isOwned = formData.get('isOwned') === 'on';
 
             const itemData = {
                 title: formData.get('title'),
@@ -318,7 +309,9 @@ export class AddItemModal {
                 imageUrl: finalImage,
                 targetDate: formData.get('targetDate') || null,
                 ownerId: authService.currentUser.uid,
-                originalUrl: magicInput.value || null
+                originalUrl: magicInput.value || null,
+                isOwned: isOwned, // Legacy
+                status: isOwned ? 'bought' : 'wish' // New Schema
             };
 
             try {
@@ -326,7 +319,7 @@ export class AddItemModal {
                     await firestoreService.updateItem(this.editingId, itemData);
                 } else {
                     await firestoreService.addItem(itemData);
-                    aiService.triggerReaction('add_wish', itemData);
+                    aiService.triggerReaction(isOwned ? 'manifest' : 'add_wish', itemData);
                 }
                 this.close();
                 if (this.onItemSaved) this.onItemSaved();
@@ -351,9 +344,8 @@ export class AddItemModal {
         const form = this.overlay.querySelector('#add-item-form');
         form.reset();
         this.editingId = null;
-        this.uploadedBase64 = null; // Reset upload
+        this.uploadedBase64 = null;
 
-        // Reset UI Elements
         const imgInput = this.overlay.querySelector('#img-input');
         imgInput.disabled = false;
         imgInput.placeholder = "https://...";
@@ -364,13 +356,10 @@ export class AddItemModal {
         document.getElementById('magic-url-container').style.display = 'none';
         document.getElementById('ai-insight-box').style.display = 'none';
 
-        // Select Category Logic (Private helper inside bindEvents, so we simulate click or manual set)
-        // Since we removed window.selectCategory, we need to manually reset pills
         const pills = this.overlay.querySelectorAll('.cat-pill');
         pills.forEach(p => p.classList.remove('selected'));
 
         if (itemToEdit) {
-            // ... (Population logic - updated to match new structure) ...
             this.editingId = itemToEdit.id;
             this.overlay.querySelector('#modal-title').textContent = i18n.t('modal.editTitle');
             this.overlay.querySelector('#input-title').value = itemToEdit.title;
@@ -383,18 +372,16 @@ export class AddItemModal {
                 this.overlay.querySelector('#img-preview').style.backgroundImage = `url('${itemToEdit.imageUrl}')`;
             }
 
-            // Trigger category selection visually
             if (itemToEdit.category) {
                 const catEl = this.overlay.querySelector(`.cat-pill[data-cat="${itemToEdit.category}"]`);
                 if (catEl) catEl.click();
-                else {
-                    // Custom category fallback logic would go here if needed
-                }
             }
 
-            // Priority
             const radio = this.overlay.querySelector(`input[name="priority"][value="${itemToEdit.priority}"]`);
             if (radio) radio.checked = true;
+
+            const ownedCheck = this.overlay.querySelector('#check-owned');
+            if (ownedCheck) ownedCheck.checked = itemToEdit.status === 'bought' || itemToEdit.isOwned;
         }
     }
 }

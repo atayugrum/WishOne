@@ -1,65 +1,58 @@
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
-import { i18n } from '../services/LocalizationService.js';
 import { apiCall } from '../config/api.js';
-import { premiumModal } from '../components/PremiumModal.js';
 import { FEATURES } from '../config/limits.js';
-import { aiService } from '../services/AIService.js';
+import { premiumModal } from '../components/PremiumModal.js';
+import { i18n } from '../services/LocalizationService.js';
+
+let availableItems = [];
+let canvasItems = [];
+let draggedItem = null;
 
 export const ComboView = {
     render: async () => {
-        const user = authService.currentUser;
-        if (!user) return `<div class="empty-state">Login required.</div>`;
-
         return `
             <div class="view-header" style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="display:flex; align-items:center; gap:12px;">
-                    <h1>${i18n.t('combos.title')}</h1>
-                    <div style="position:relative;">
-                        <input type="file" id="combo-cover-upload" accept="image/*" style="display:none;">
-                        <button class="icon-btn" id="btn-set-cover" title="Set Cover Image" style="background:rgba(0,0,0,0.05); border-radius:50%; width:40px; height:40px;">📷</button>
-                        <img id="combo-cover-preview" style="width:40px; height:40px; border-radius:50%; position:absolute; top:0; left:0; object-fit:cover; display:none; border:2px solid var(--accent-color);">
+                <div>
+                    <h1>${i18n.t('nav.combos')}</h1>
+                    <p>Mix & Match your style.</p>
+                </div>
+                <div>
+                    <button class="btn-magic" id="btn-ai-combo">✨ AI Suggest</button>
+                    <button class="btn-primary" id="btn-save-combo">💾 Save</button>
+                </div>
+            </div>
+
+            <div class="combo-workspace" style="display:flex; gap:20px; height: calc(100vh - 200px); min-height: 500px;">
+                
+                <!-- Sidebar: Items -->
+                <div class="combo-sidebar glass-panel" style="width:250px; display:flex; flex-direction:column; padding:16px;">
+                    <div class="auth-tabs compact-tabs" style="margin-bottom:12px;">
+                        <div class="auth-tab active" id="tab-closet">Closet</div>
+                        <div class="auth-tab" id="tab-wishlist">Wishlist</div>
+                    </div>
+                    <input type="text" id="combo-search" placeholder="Search items..." style="width:100%; margin-bottom:12px; padding:8px; border-radius:8px; border:1px solid rgba(0,0,0,0.1);">
+                    
+                    <div id="combo-items-list" style="flex:1; overflow-y:auto; display:grid; grid-template-columns:1fr 1fr; gap:8px; align-content:start;">
+                        <div class="loading-spinner">Loading...</div>
                     </div>
                 </div>
-                <div style="display:flex; gap:12px;">
-                    <button class="btn-magic" id="btn-ai-stylist">✨ Stylist</button>
-                    <button class="btn-primary" id="btn-save-combo">${i18n.t('combos.save')}</button>
+
+                <!-- Canvas -->
+                <div class="combo-canvas-container" style="flex:1; position:relative;">
+                    <div id="combo-canvas" class="glass-panel" style="width:100%; height:100%; position:relative; overflow:hidden; background:rgba(255,255,255,0.8);">
+                        <p class="canvas-placeholder" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); opacity:0.3; pointer-events:none;">
+                            Drag items here
+                        </p>
+                    </div>
+                    <button id="btn-clear-canvas" style="position:absolute; bottom:16px; right:16px; padding:8px 12px; border-radius:8px; background:rgba(0,0,0,0.1); border:none; cursor:pointer;">Clear</button>
                 </div>
+
             </div>
             
-            <div class="combo-layout">
-                <div class="combo-canvas glass-panel" id="combo-canvas">
-                    <div class="canvas-placeholder">${i18n.t('combos.drag_text')}</div>
-                    <div id="canvas-items-container" style="display:flex; flex-wrap:wrap; gap:16px; padding:20px; width:100%; height:100%; align-content: flex-start;"></div>
-                </div>
-                
-                <div class="combo-sidebar glass-panel" style="padding:16px; display:flex; flex-direction:column; gap:20px;">
-                    <div style="display:flex; gap:8px;">
-                        <label class="btn-text" style="background:rgba(0,0,0,0.05); padding:8px 12px; border-radius:8px; cursor:pointer; font-size:0.8rem; flex:1; text-align:center;">
-                            + Upload Image
-                            <input type="file" id="sidebar-upload" accept="image/*" style="display:none;">
-                        </label>
-                    </div>
-
-                    <div id="sidebar-content" style="max-height: 60vh; overflow-y: auto; padding-right:4px;">
-                        <div class="loading-spinner">${i18n.t('common.loading')}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div style="margin-top: 40px;">
-                <h3 style="margin-bottom: 16px;">${i18n.t('combos.saved_section') || 'Saved Combos'}</h3>
-                <div id="saved-combos-grid" class="masonry-grid"></div>
-            </div>
-
-            <div id="stylist-modal" class="modal-overlay">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3>🤖 AI Stylist</h3>
-                        <button class="close-btn" onclick="document.getElementById('stylist-modal').classList.remove('active')">&times;</button>
-                    </div>
-                    <div id="stylist-results"></div>
-                </div>
+            <div id="saved-combos-list" style="margin-top:32px;">
+                <h3>Saved Combos</h3>
+                <div id="combos-grid" class="masonry-grid" style="margin-top:16px;"></div>
             </div>
         `;
     },
@@ -68,309 +61,210 @@ export const ComboView = {
         const user = authService.currentUser;
         if (!user) return;
 
-        const sidebarContent = document.getElementById('sidebar-content');
-        const canvas = document.getElementById('combo-canvas');
-        const canvasContainer = document.getElementById('canvas-items-container');
-        const placeholder = canvas.querySelector('.canvas-placeholder');
-        const savedGrid = document.getElementById('saved-combos-grid');
+        // Load Data
+        let closet = [];
+        let wishlist = [];
 
-        // [NEW] Elements
-        const sidebarUpload = document.getElementById('sidebar-upload');
-        const coverUpload = document.getElementById('combo-cover-upload');
-        const btnSetCover = document.getElementById('btn-set-cover');
-        const coverPreview = document.getElementById('combo-cover-preview');
-
-        let allItems = [];
-        let currentCanvasItems = [];
-        let editingComboId = null; // Track edit state
-        let customCoverUrl = null; // Track custom cover
-
-        // --- 1. Load Data ---
         try {
-            const [closetItems, wishlistItems, savedCombos] = await Promise.all([
+            [closet, wishlist] = await Promise.all([
                 firestoreService.getCloset(user.uid),
-                firestoreService.getWishlist(user.uid, user.uid),
-                firestoreService.getCombos(user.uid)
+                firestoreService.getWishlist(user.uid, user.uid)
             ]);
+        } catch (e) { console.error(e); }
 
-            allItems = [...closetItems, ...wishlistItems];
-            renderSidebar(closetItems, wishlistItems);
-            renderSavedCombos(savedCombos);
-        } catch (e) {
-            console.error(e);
-            sidebarContent.innerHTML = `<p style="color:var(--text-secondary)">Error loading items.</p>`;
-        }
+        const renderSidebar = (source) => {
+            const list = document.getElementById('combo-items-list');
+            const items = source === 'closet' ? closet : wishlist;
+            const search = document.getElementById('combo-search').value.toLowerCase();
 
-        // --- 2. Render Functions ---
-        function renderSidebar(closet, wishlist) {
-            let html = '';
-            // Wishlist
-            if (wishlist.length > 0) {
-                html += `<h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px; letter-spacing:1px;">${i18n.t('nav.home') || 'Wishlist'}</h4>`;
-                html += `<div class="closet-grid-mini" style="margin-bottom:20px;">` + wishlist.map(item => renderMiniItem(item)).join('') + `</div>`;
-            }
-            // Closet
-            if (closet.length > 0) {
-                html += `<h4 style="font-size:0.85rem; text-transform:uppercase; color:var(--text-secondary); margin-bottom:8px; letter-spacing:1px;">${i18n.t('nav.closet') || 'Closet'}</h4>`;
-                html += `<div class="closet-grid-mini">` + closet.map(item => renderMiniItem(item)).join('') + `</div>`;
-            }
-            if (!html) html = `<p style="font-size:0.8rem;">No items found.</p>`;
+            const filtered = items.filter(i => i.title.toLowerCase().includes(search));
 
-            sidebarContent.innerHTML = html;
-
-            // Re-bind Drag
-            document.querySelectorAll('.closet-item-mini').forEach(el => el.addEventListener('dragstart', handleDragStart));
-        }
-
-        function renderMiniItem(item) {
-            return `
-                <div class="closet-item-mini" draggable="true" data-id="${item.id}" style="cursor: grab; position:relative;">
-                    <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover; pointer-events:none;">
-                    ${item.isOwned ? '<span style="position:absolute; bottom:2px; right:2px; font-size:0.7rem;">🧥</span>' : ''}
-                </div>
-            `;
-        }
-
-        function renderSavedCombos(combos) {
-            if (combos.length === 0) {
-                savedGrid.innerHTML = `<div style="grid-column: 1/-1; text-align:center; color:var(--text-tertiary);">No saved combos yet.</div>`;
-                return;
-            }
-
-            savedGrid.innerHTML = combos.map(combo => {
-                const cover = combo.coverImageUrl || (combo.previewImages && combo.previewImages[0]);
-                return `
-                <div class="glass-panel card" style="padding: 16px; position:relative;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h4 style="margin:0; font-size:1rem;">${combo.title}</h4>
-                        <div style="display:flex; gap:8px;">
-                            <button class="btn-text" onclick="window.editCombo('${combo.id}')" style="color:var(--accent-color);">✎</button>
-                            <button class="btn-text" onclick="window.deleteCombo('${combo.id}')" style="color:#ff3b30;">&times;</button>
-                        </div>
-                    </div>
-                    <div style="height:150px; background:#f0f0f0; border-radius:12px; overflow:hidden;">
-                        <img src="${cover}" style="width:100%; height:100%; object-fit:cover;">
-                    </div>
-                </div>
-            `}).join('');
-        }
-
-        // --- 3. Interaction Logic ---
-
-        // Sidebar Upload
-        sidebarUpload.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    // Create temp item
-                    const tempItem = {
-                        id: `temp_${Date.now()}`,
-                        title: 'Upload',
-                        imageUrl: ev.target.result,
-                        category: 'Upload'
-                    };
-                    // Add to allItems so drag works
-                    allItems.push(tempItem);
-                    // Force add to canvas
-                    addToCanvas(tempItem);
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        // Set Cover Logic
-        btnSetCover.onclick = () => coverUpload.click();
-        coverUpload.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    customCoverUrl = ev.target.result;
-                    coverPreview.src = customCoverUrl;
-                    coverPreview.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        // Edit Combo Logic
-        window.editCombo = async (id) => {
-            const combo = (await firestoreService.getCombos(user.uid)).find(c => c.id === id);
-            if (!combo) return;
-
-            editingComboId = combo.id;
-            customCoverUrl = combo.coverImageUrl;
-
-            // Restore Items
-            currentCanvasItems = [];
-            combo.itemIds.forEach(itemId => {
-                const item = allItems.find(i => i.id === itemId);
-                if (item) currentCanvasItems.push(item);
-                // Note: Uploads without permanent ID might be lost in this simplified logic 
-                // unless we saved them to storage. For now, we assume wishlist/closet items.
-            });
-
-            // Update UI
-            renderCanvas();
-            document.getElementById('btn-save-combo').textContent = "Update Combo";
-
-            if (customCoverUrl) {
-                coverPreview.src = customCoverUrl;
-                coverPreview.style.display = 'block';
-            }
-
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        };
-
-        window.deleteCombo = async (id) => {
-            if (confirm(i18n.t('common.confirm'))) {
-                await firestoreService.deleteCombo(id);
-                const combos = await firestoreService.getCombos(user.uid);
-                renderSavedCombos(combos);
-            }
-        };
-
-        // Drag & Drop
-        function handleDragStart(e) {
-            const id = e.target.dataset.id;
-            const item = allItems.find(i => i.id === id);
-            if (item) {
-                e.dataTransfer.setData('text/plain', JSON.stringify(item));
-                e.dataTransfer.effectAllowed = 'copy';
-            }
-        }
-
-        canvas.addEventListener('dragover', (e) => { e.preventDefault(); canvas.classList.add('drag-over'); });
-        canvas.addEventListener('dragleave', () => { canvas.classList.remove('drag-over'); });
-        canvas.addEventListener('drop', (e) => {
-            e.preventDefault();
-            canvas.classList.remove('drag-over');
-            try {
-                const data = e.dataTransfer.getData('text/plain');
-                if (!data) return;
-                const item = JSON.parse(data);
-                addToCanvas(item);
-            } catch (err) { console.warn("Invalid drop", err); }
-        });
-
-        function addToCanvas(item) {
-            if (currentCanvasItems.find(i => i.id === item.id)) return;
-            currentCanvasItems.push(item);
-            renderCanvas();
-        }
-
-        window.removeFromCanvas = (id) => {
-            currentCanvasItems = currentCanvasItems.filter(i => i.id !== id);
-            renderCanvas();
-        };
-
-        function renderCanvas() {
-            if (currentCanvasItems.length > 0) placeholder.style.display = 'none';
-            else placeholder.style.display = 'block';
-
-            canvasContainer.innerHTML = currentCanvasItems.map(item => `
-                <div class="canvas-item" style="position:relative; width:100px; height:100px; cursor:default;">
-                    <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-                    <button onclick="window.removeFromCanvas('${item.id}')" style="position:absolute; top:-8px; right:-8px; background:white; color:#ff3b30; border:1px solid #ff3b30; border-radius:50%; width:24px; height:24px; cursor:pointer; font-weight:bold; display:flex; align-items:center; justify-content:center;">&times;</button>
+            list.innerHTML = filtered.map(item => `
+                <div class="combo-item-thumb" draggable="true" data-id="${item.id}" style="cursor:grab;">
+                    <img src="${item.imageUrl}" style="width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; pointer-events:none;">
+                    <div style="font-size:0.7rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:4px;">${item.title}</div>
                 </div>
             `).join('');
+
+            // Drag Events
+            list.querySelectorAll('.combo-item-thumb').forEach(el => {
+                el.addEventListener('dragstart', (e) => {
+                    const id = el.dataset.id;
+                    const itemData = items.find(i => i.id === id);
+                    e.dataTransfer.setData('text/plain', JSON.stringify(itemData));
+                    draggedItem = itemData; // Fallback
+                });
+            });
+        };
+
+        // Tabs
+        const tabCloset = document.getElementById('tab-closet');
+        const tabWish = document.getElementById('tab-wishlist');
+
+        tabCloset.onclick = () => {
+            tabCloset.classList.add('active');
+            tabWish.classList.remove('active');
+            renderSidebar('closet');
+        };
+        tabWish.onclick = () => {
+            tabWish.classList.add('active');
+            tabCloset.classList.remove('active');
+            renderSidebar('wishlist');
+        };
+
+        document.getElementById('combo-search').addEventListener('input', () => {
+            renderSidebar(tabCloset.classList.contains('active') ? 'closet' : 'wishlist');
+        });
+
+        renderSidebar('closet');
+
+        // Canvas Logic
+        const canvas = document.getElementById('combo-canvas');
+
+        canvas.addEventListener('dragover', (e) => e.preventDefault());
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left - 50; // Center offset
+                const y = e.clientY - rect.top - 50;
+
+                addItemToCanvas(data, x, y);
+            } catch (err) { console.error(err); }
+        });
+
+        function addItemToCanvas(item, x, y) {
+            const el = document.createElement('div');
+            el.className = 'canvas-item';
+            el.style.position = 'absolute';
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+            el.style.width = '100px';
+            el.style.cursor = 'move';
+
+            el.innerHTML = `
+                <img src="${item.imageUrl}" style="width:100%; border-radius:8px; box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+                <button class="remove-canvas-item" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border-radius:50%; width:20px; height:20px; border:none; cursor:pointer; font-size:12px;">&times;</button>
+            `;
+
+            // Canvas Drag Logic (Moving items inside canvas)
+            let isDragging = false;
+            let startX, startY;
+
+            el.onmousedown = (e) => {
+                if (e.target.tagName === 'BUTTON') return;
+                isDragging = true;
+                startX = e.clientX - el.offsetLeft;
+                startY = e.clientY - el.offsetTop;
+                el.style.zIndex = 100;
+            };
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                el.style.left = `${e.clientX - startX}px`;
+                el.style.top = `${e.clientY - startY}px`;
+            });
+
+            window.addEventListener('mouseup', () => {
+                isDragging = false;
+                el.style.zIndex = '';
+            });
+
+            el.querySelector('.remove-canvas-item').onclick = () => {
+                el.remove();
+                canvasItems = canvasItems.filter(i => i.id !== item.id); // Simple filter, assumes unique items for now
+            };
+
+            canvas.appendChild(el);
+            canvasItems.push({ id: item.id, ...item });
+            document.querySelector('.canvas-placeholder').style.display = 'none';
         }
 
-        // Save Combo
-        document.getElementById('btn-save-combo').addEventListener('click', async () => {
-            if (currentCanvasItems.length < 2) return alert("Add at least 2 items.");
+        document.getElementById('btn-clear-canvas').onclick = () => {
+            canvas.innerHTML = `<p class="canvas-placeholder" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); opacity:0.3; pointer-events:none;">Drag items here</p>`;
+            canvasItems = [];
+        };
 
-            const title = prompt("Name this outfit:", editingComboId ? "Updated Look" : "My Vibe");
+        // Save
+        document.getElementById('btn-save-combo').onclick = async () => {
+            if (canvasItems.length === 0) return alert("Canvas is empty.");
+            const title = prompt("Name this combo:");
             if (!title) return;
 
-            const btn = document.getElementById('btn-save-combo');
-            btn.textContent = i18n.t('common.saving');
-            btn.disabled = true;
-
             try {
-                // If editing, delete old one first (simple update logic)
-                if (editingComboId) {
-                    await firestoreService.deleteCombo(editingComboId);
-                }
-
-                const comboData = {
+                await firestoreService.saveCombo(user.uid, {
                     title,
-                    itemIds: currentCanvasItems.map(i => i.id),
-                    previewImages: currentCanvasItems.map(i => i.imageUrl).slice(0, 4),
-                    coverImageUrl: customCoverUrl || null // Save custom cover
-                };
+                    items: canvasItems.map(i => i.id),
+                    previewImage: canvasItems[0].imageUrl // Simple preview
+                });
+                window.showToast("Combo saved!", "💾");
+                ComboView.loadSavedCombos(user.uid);
+                document.getElementById('btn-clear-canvas').click();
+            } catch (e) { alert("Error saving."); }
+        };
 
-                await firestoreService.saveCombo(user.uid, comboData);
-                aiService.triggerReaction('create_combo', { title });
+        // AI Suggest
+        document.getElementById('btn-ai-combo').onclick = async () => {
+            if (!authService.canUseFeature(FEATURES.AI_COMBOS)) { premiumModal.open(); return; }
 
-                alert(i18n.t('common.success'));
-
-                // Reset
-                currentCanvasItems = [];
-                editingComboId = null;
-                customCoverUrl = null;
-                coverPreview.style.display = 'none';
-                btn.textContent = i18n.t('combos.save');
-                renderCanvas();
-
-                const combos = await firestoreService.getCombos(user.uid);
-                renderSavedCombos(combos);
-
-            } catch (err) {
-                console.error(err);
-                alert(i18n.t('common.error'));
-            } finally {
-                btn.disabled = false;
-            }
-        });
-
-        // Stylist Logic (Unchanged from previous robust version)
-        document.getElementById('btn-ai-stylist').addEventListener('click', async () => {
-            if (!authService.canUseFeature(FEATURES.AI_COMBO)) { premiumModal.open(); return; }
-            if (allItems.length < 2) return alert("Add more items first!");
-
-            const modal = document.getElementById('stylist-modal');
-            const results = document.getElementById('stylist-results');
-            modal.style.display = 'flex';
-            requestAnimationFrame(() => modal.classList.add('active'));
-            results.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
-
-            if (window.aiCompanion) window.aiCompanion.say("Let me see what works...", "thinking");
+            const btn = document.getElementById('btn-ai-combo');
+            btn.textContent = "Thinking...";
 
             try {
-                const data = await apiCall('/api/ai/combo-suggestions', 'POST', { closetItems: allItems });
-                authService.trackFeatureUsage(FEATURES.AI_COMBO);
+                // Send simplified list to AI
+                const available = [...closet, ...wishlist].map(i => ({ id: i.id, title: i.title, category: i.category }));
 
-                if (data.combos && data.combos.length > 0) {
-                    if (window.aiCompanion) window.aiCompanion.say("I love these looks!", "celebrating");
-                    results.innerHTML = data.combos.map((combo, idx) => `
-                        <div class="glass-panel" style="padding:16px; margin-bottom:12px; cursor:pointer;" onclick="window.applyAiCombo(${idx})">
-                            <div style="font-weight:700; font-size:1.1rem; margin-bottom:4px;">${combo.name}</div>
-                            <p style="font-size:0.9rem; color:var(--text-secondary);">${combo.description}</p>
-                            <div style="display:flex; gap:8px; margin-top:8px;">
-                                ${combo.itemIds.map(id => {
-                        const item = allItems.find(i => i.id === id);
-                        return item ? `<img src="${item.imageUrl}" style="width:40px; height:40px; border-radius:8px; object-fit:cover;">` : '';
-                    }).join('')}
-                            </div>
-                        </div>
-                    `).join('');
+                const data = await apiCall('/api/ai/combo-suggestions', 'POST', { items: available });
 
-                    window.applyAiCombo = (idx) => {
-                        const combo = data.combos[idx];
-                        currentCanvasItems = combo.itemIds.map(id => allItems.find(i => i.id === id)).filter(Boolean);
-                        renderCanvas();
-                        modal.classList.remove('active');
-                        setTimeout(() => modal.style.display = 'none', 300);
-                        if (window.aiCompanion) window.aiCompanion.say("Try it on!", "magic");
-                    };
+                if (data.suggestions && data.suggestions.length > 0) {
+                    const suggestion = data.suggestions[0]; // Take first
+                    document.getElementById('btn-clear-canvas').click();
+
+                    // Place items in a grid on canvas
+                    suggestion.itemIds.forEach((id, index) => {
+                        const item = [...closet, ...wishlist].find(i => i.id === id);
+                        if (item) {
+                            addItemToCanvas(item, 50 + (index * 110), 50);
+                        }
+                    });
+                    alert(`AI Suggestion: ${suggestion.name}\n${suggestion.reason}`);
                 } else {
-                    results.innerHTML = `<p style="text-align:center;">No matches found.</p>`;
+                    alert("AI couldn't find a good combo.");
                 }
-            } catch (error) {
-                results.innerHTML = `<p style="color:red; text-align:center;">${i18n.t('ai.error')}</p>`;
+            } catch (e) {
+                console.error(e);
+                alert("AI error.");
+            } finally {
+                btn.textContent = "✨ AI Suggest";
             }
-        });
+        };
+
+        ComboView.loadSavedCombos(user.uid);
+    },
+
+    loadSavedCombos: async (uid) => {
+        const grid = document.getElementById('combos-grid');
+        if (!grid) return;
+        try {
+            const combos = await firestoreService.getCombos(uid);
+            grid.innerHTML = combos.map(c => `
+                <div class="glass-panel card">
+                    <div style="height:150px; background:url('${c.previewImage}') center/cover; border-radius:12px 12px 0 0;"></div>
+                    <div style="padding:12px;">
+                        <h4>${c.title}</h4>
+                        <p style="font-size:0.8rem; color:#666;">${c.items.length} items</p>
+                    </div>
+                    <button class="btn-text" onclick="window.deleteCombo('${c.id}')" style="color:red; position:absolute; bottom:10px; right:10px;">&times;</button>
+                </div>
+            `).join('');
+
+            window.deleteCombo = async (id) => {
+                if (confirm("Delete this combo?")) {
+                    await firestoreService.deleteCombo(id);
+                    ComboView.loadSavedCombos(uid);
+                }
+            };
+        } catch (e) { console.error(e); }
     }
 };

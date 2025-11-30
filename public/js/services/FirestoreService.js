@@ -13,7 +13,7 @@ import {
     serverTimestamp,
     orderBy,
     limit,
-    writeBatch // [NEW] Added writeBatch
+    writeBatch
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 export class FirestoreService {
@@ -24,6 +24,11 @@ export class FirestoreService {
 
     _transformItem(doc) {
         const data = doc.data();
+        let derivedStatus = data.status;
+        if (!derivedStatus) {
+            derivedStatus = data.isOwned ? 'bought' : 'wish';
+        }
+
         return {
             id: doc.id,
             title: data.title,
@@ -38,11 +43,14 @@ export class FirestoreService {
             originalUrl: data.originalUrl || null,
             onSale: data.onSale || false,
             visibility: data.visibility || 'default',
+            status: derivedStatus,
+            isOwned: data.isOwned || false,
+            targetDate: data.targetDate || null,
+            deleted: data.deleted || false,
             ...data
         };
     }
 
-    // --- USER MANAGEMENT ---
     async deleteUserData(userId) {
         const batch = writeBatch(db);
         const itemsQ = query(this.itemsCollection, where("ownerId", "==", userId));
@@ -59,7 +67,6 @@ export class FirestoreService {
         await batch.commit();
     }
 
-    // --- ACTIVITY LOG ---
     async addActivity(userId, type, details) {
         try {
             await addDoc(collection(db, 'users', userId, 'activities'), {
@@ -78,7 +85,6 @@ export class FirestoreService {
         } catch (e) { return []; }
     }
 
-    // 1. Get Wishlist (Privacy Aware)
     async checkIsFriend(ownerId, viewerId) {
         if (!viewerId) return false;
         if (ownerId === viewerId) return true;
@@ -86,35 +92,78 @@ export class FirestoreService {
             const friendRef = doc(db, "users", ownerId, "friends", viewerId);
             const snap = await getDoc(friendRef);
             return snap.exists();
-        } catch (e) {
-            console.error("Friend check error:", e);
-            return false;
-        }
+        } catch (e) { return false; }
+    }
+
+    // [UPDATED] Check Block Status
+    async checkIsBlocked(userA, userB) {
+        if (!userA || !userB) return false;
+        // Check if A blocked B
+        const blockRef1 = doc(db, "users", userA, "blocked", userB);
+        const snap1 = await getDoc(blockRef1);
+        if (snap1.exists()) return true;
+
+        // Check if B blocked A
+        const blockRef2 = doc(db, "users", userB, "blocked", userA);
+        const snap2 = await getDoc(blockRef2);
+        if (snap2.exists()) return true;
+
+        return false;
     }
 
     async getWishlist(userId, viewerId = null) {
         try {
-            const q = query(this.itemsCollection, where("ownerId", "==", userId), where("isOwned", "==", false));
-            const querySnapshot = await getDocs(q);
+            // [NEW] Safety Check
+            if (userId !== viewerId) {
+                const isBlocked = await this.checkIsBlocked(userId, viewerId);
+                if (isBlocked) throw new Error("Content unavailable.");
+            }
+
+            const q = query(this.itemsCollection, where("ownerId", "==", userId));
+            const [querySnapshot, ownerProfile] = await Promise.all([
+                getDocs(q),
+                this.getUserProfile(userId)
+            ]);
+
             let items = querySnapshot.docs.map(doc => this._transformItem(doc));
 
-            if (userId === viewerId) return items;
+            if (userId === viewerId) {
+                return items.filter(i => !i.deleted);
+            }
 
             const isFriend = await this.checkIsFriend(userId, viewerId);
 
+            let defaultVis = 'public';
+            if (ownerProfile) {
+                if (ownerProfile.defaultVisibility) defaultVis = ownerProfile.defaultVisibility;
+                else if (ownerProfile.isPrivate) defaultVis = 'private';
+            }
+
             return items.filter(item => {
-                const vis = item.visibility || 'public';
+                if (item.deleted) return false;
+
+                let vis = item.visibility || 'default';
+                if (vis === 'default') vis = defaultVis;
+
                 if (vis === 'private') return false;
                 if (vis === 'friends') return isFriend;
-                return true;
+                return item.status === 'wish';
             });
         } catch (error) { throw error; }
     }
 
-    // 2. Add Item
     async addItem(itemData) {
-        const docRef = await addDoc(this.itemsCollection, { ...itemData, createdAt: serverTimestamp(), lastUpdatedAt: serverTimestamp(), isOwned: false, claimedBy: null });
-        this.addActivity(itemData.ownerId, 'add_wish', { title: itemData.title });
+        const docRef = await addDoc(this.itemsCollection, {
+            ...itemData,
+            status: itemData.status || 'wish',
+            createdAt: serverTimestamp(),
+            lastUpdatedAt: serverTimestamp(),
+            isOwned: itemData.isOwned || false,
+            claimedBy: null,
+            deleted: false
+        });
+        const type = itemData.status === 'bought' ? 'manifest' : 'add_wish';
+        this.addActivity(itemData.ownerId, type, { title: itemData.title });
         return docRef.id;
     }
 
@@ -126,46 +175,35 @@ export class FirestoreService {
     async checkItemExists(userId, url) {
         if (!url) return false;
         try {
-            const q = query(this.itemsCollection, where("ownerId", "==", userId), where("originalUrl", "==", url), where("isOwned", "==", false));
+            const q = query(this.itemsCollection, where("ownerId", "==", userId), where("originalUrl", "==", url));
             const snap = await getDocs(q);
-            return !snap.empty;
+            const activeDocs = snap.docs.filter(d => !d.data().deleted);
+            return activeDocs.length > 0;
         } catch (error) { return false; }
     }
 
     async deleteItem(itemId) {
         const itemRef = doc(db, 'items', itemId);
-        await deleteDoc(itemRef);
+        await updateDoc(itemRef, { deleted: true, status: 'archived' });
     }
 
-    // 4. FRIEND MANAGEMENT (REFACTORED)
-
-    // [NEW] Send Request
     async sendFriendRequest(myUid, friendEmail) {
         const usersRef = collection(db, "users");
         const q = query(usersRef, where("email", "==", friendEmail));
         const querySnapshot = await getDocs(q);
-
         if (querySnapshot.empty) throw new Error("User not found.");
-
         const friendDoc = querySnapshot.docs[0];
         const friendId = friendDoc.id;
-
         if (friendId === myUid) throw new Error("Cannot add yourself.");
 
-        // Check existing friendship
+        // Block check
+        if (await this.checkIsBlocked(myUid, friendId)) throw new Error("Cannot add this user.");
+
         const existingFriend = await getDoc(doc(db, "users", myUid, "friends", friendId));
         if (existingFriend.exists()) throw new Error("Already friends.");
-
-        // Check pending request (Outgoing)
         const outgoingReq = await getDoc(doc(db, "users", friendId, "friend_requests", myUid));
         if (outgoingReq.exists()) throw new Error("Request already sent.");
-
-        // Check pending request (Incoming - edge case, just accept it?)
-        // For simplicity, we just block double requests.
-
         const myProfile = await this.getUserProfile(myUid);
-
-        // Write to Recipient's subcollection
         await setDoc(doc(db, "users", friendId, "friend_requests", myUid), {
             fromUid: myUid,
             fromName: myProfile.displayName,
@@ -173,24 +211,19 @@ export class FirestoreService {
             fromPhoto: myProfile.photoURL,
             timestamp: serverTimestamp()
         });
-
         return friendDoc.data();
     }
 
-    // [NEW] Get Requests
     async getIncomingRequests(userId) {
         const q = query(collection(db, "users", userId, "friend_requests"), orderBy("timestamp", "desc"));
         const snap = await getDocs(q);
         return snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     }
 
-    // [NEW] Accept Request
     async acceptFriendRequest(myUid, senderUid) {
         const senderProfile = await this.getUserProfile(senderUid);
         const myProfile = await this.getUserProfile(myUid);
         const batch = writeBatch(db);
-
-        // 1. Add Sender to My Friends
         const myFriendRef = doc(db, "users", myUid, "friends", senderUid);
         batch.set(myFriendRef, {
             uid: senderUid,
@@ -199,8 +232,6 @@ export class FirestoreService {
             avatarUrl: senderProfile.photoURL,
             addedAt: serverTimestamp()
         });
-
-        // 2. Add Me to Sender's Friends
         const theirFriendRef = doc(db, "users", senderUid, "friends", myUid);
         batch.set(theirFriendRef, {
             uid: myUid,
@@ -209,28 +240,36 @@ export class FirestoreService {
             avatarUrl: myProfile.avatarUrl,
             addedAt: serverTimestamp()
         });
-
-        // 3. Delete Request
         const reqRef = doc(db, "users", myUid, "friend_requests", senderUid);
         batch.delete(reqRef);
-
         await batch.commit();
         this.addActivity(myUid, 'friend_add', { name: senderProfile.displayName });
     }
 
-    // [NEW] Reject Request
     async rejectFriendRequest(myUid, senderUid) {
         await deleteDoc(doc(db, "users", myUid, "friend_requests", senderUid));
     }
 
-    // Get Friends List
     async getFriends(userId) {
         const friendsRef = collection(db, "users", userId, "friends");
         const snap = await getDocs(friendsRef);
         return snap.docs.map(doc => doc.data());
     }
 
-    // 5. User Profile
+    // [NEW] Block User
+    async blockUser(myUid, targetUid) {
+        // 1. Add to blocked collection
+        await setDoc(doc(db, "users", myUid, "blocked", targetUid), {
+            blockedAt: serverTimestamp()
+        });
+
+        // 2. Remove friendship if exists
+        const batch = writeBatch(db);
+        batch.delete(doc(db, "users", myUid, "friends", targetUid));
+        batch.delete(doc(db, "users", targetUid, "friends", myUid));
+        await batch.commit();
+    }
+
     async getUserProfile(uid) {
         const docRef = doc(db, "users", uid);
         const snap = await getDoc(docRef);
@@ -249,7 +288,6 @@ export class FirestoreService {
         return snap.empty;
     }
 
-    // 6. Claim
     async toggleClaimItem(itemId, userId, currentClaimedBy) {
         const itemRef = doc(db, 'items', itemId);
         if (currentClaimedBy === userId) { await updateDoc(itemRef, { claimedBy: null }); return "unclaimed"; }
@@ -257,9 +295,15 @@ export class FirestoreService {
         else throw new Error("Reserved.");
     }
 
-    // 7. BOARD MANAGEMENT
-    async createBoard(userId, title, coverUrl) {
-        await addDoc(collection(db, 'boards'), { ownerId: userId, title, coverUrl: coverUrl || 'https://placehold.co/600x400/png?text=Vibe', createdAt: serverTimestamp(), pinCount: 0 });
+    async createBoard(userId, title, coverUrl, privacy = 'private') {
+        await addDoc(collection(db, 'boards'), {
+            ownerId: userId,
+            title,
+            coverUrl: coverUrl || 'https://placehold.co/600x400/png?text=Vibe',
+            privacy,
+            createdAt: serverTimestamp(),
+            pinCount: 0
+        });
         this.addActivity(userId, 'create_board', { title });
     }
 
@@ -269,12 +313,15 @@ export class FirestoreService {
     async addPin(boardId, imageUrl) { await addDoc(collection(db, 'boards', boardId, 'pins'), { imageUrl, createdAt: serverTimestamp() }); }
     async getPins(boardId) { const q = query(collection(db, 'boards', boardId, 'pins')); const snap = await getDocs(q); return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); }
 
-    // 8. CLOSET MANAGEMENT
     async markAsOwned(itemId) {
         const itemRef = doc(db, 'items', itemId);
         const snap = await getDoc(itemRef);
         const title = snap.exists() ? snap.data().title : 'Item';
-        await updateDoc(itemRef, { isOwned: true, purchasedAt: serverTimestamp() });
+        await updateDoc(itemRef, {
+            isOwned: true,
+            status: 'bought',
+            purchasedAt: serverTimestamp()
+        });
         this.addActivity(snap.data().ownerId, 'manifest', { title });
     }
 
@@ -284,22 +331,50 @@ export class FirestoreService {
         if (snap.exists()) {
             this.addActivity(snap.data().ownerId, 'return_wish', { title: snap.data().title });
         }
-        await updateDoc(itemRef, { isOwned: false });
+        await updateDoc(itemRef, {
+            isOwned: false,
+            status: 'wish'
+        });
     }
 
     async getCloset(userId) {
-        const q = query(this.itemsCollection, where("ownerId", "==", userId), where("isOwned", "==", true));
+        const q = query(this.itemsCollection, where("ownerId", "==", userId));
         const snap = await getDocs(q);
-        return snap.docs.map(doc => this._transformItem(doc));
+        const items = snap.docs.map(doc => this._transformItem(doc));
+        return items.filter(i => i.status === 'bought' && !i.deleted);
     }
 
-    // 9. COMBOS
     async saveCombo(userId, comboData) {
         await addDoc(collection(db, 'combos'), { ownerId: userId, ...comboData, createdAt: serverTimestamp() });
         this.addActivity(userId, 'create_combo', { title: comboData.title });
     }
     async deleteCombo(comboId) { const ref = doc(db, 'combos', comboId); await deleteDoc(ref); }
     async getCombos(userId) { const q = query(collection(db, 'combos'), where("ownerId", "==", userId)); const snap = await getDocs(q); return snap.docs.map(doc => ({ id: doc.id, ...doc.data() })); }
+
+    async exportAllData(userId) {
+        const profile = await this.getUserProfile(userId);
+
+        const qItems = query(this.itemsCollection, where("ownerId", "==", userId));
+        const itemsSnap = await getDocs(qItems);
+        const items = itemsSnap.docs.map(d => this._transformItem(d));
+
+        const qBoards = query(collection(db, 'boards'), where("ownerId", "==", userId));
+        const boardsSnap = await getDocs(qBoards);
+        const boards = boardsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        const qCombos = query(collection(db, 'combos'), where("ownerId", "==", userId));
+        const combosSnap = await getDocs(qCombos);
+        const combos = combosSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        return {
+            profile,
+            items,
+            boards,
+            combos,
+            exportDate: new Date().toISOString(),
+            app: "WishOne"
+        };
+    }
 }
 
 export const firestoreService = new FirestoreService();

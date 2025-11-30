@@ -14,10 +14,19 @@ import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/fireba
 
 let addItemModal = null;
 let itemsMap = new Map();
-let showSaleOnly = false;
-let currentSearchTerm = '';
 
-// Helper: Countdown
+// Filter State
+let currentFilters = {
+    saleOnly: false,
+    category: 'All',
+    occasion: 'All',
+    status: 'wish', // 'wish' | 'archived'
+    priceMin: null,
+    priceMax: null,
+    search: '',
+    viewMode: 'grid' // 'grid' | 'timeline'
+};
+
 function getCountdown(dateString) {
     if (!dateString) return null;
     const target = new Date(dateString);
@@ -50,7 +59,13 @@ export const HomeView = {
     `,
 
     render: async () => {
-        // Return pure HTML structure
+        const cats = ['All', ...Object.keys(CATEGORIES)];
+        const catOptions = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+
+        // Occasions
+        const occasions = ['All', 'Birthday', 'New Year', 'Anniversary', 'Self-care', 'Custom'];
+        const occOptions = occasions.map(o => `<option value="${o}">${o}</option>`).join('');
+
         return `
             <div class="view-header" style="display:flex; flex-direction:column; gap:20px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-end; width:100%;">
@@ -64,17 +79,47 @@ export const HomeView = {
                     <div class="view-toggle">
                         <button id="btn-planner" class="btn-magic" style="margin-right:12px; opacity:0.5; cursor:not-allowed;" title="${i18n.t('home.planner_locked')}">💰</button>
                         <button class="toggle-btn" id="btn-share-list" title="${i18n.t('home.share_btn')}" style="margin-right:12px;">🔗</button>
-                        <button id="btn-sale-filter" class="toggle-btn" title="${i18n.t('home.sale_filter')}" style="margin-right:12px;">%</button>
-                        <button id="btn-grid" class="toggle-btn active">⊞</button>
+                        
+                        <div style="display:flex; background:rgba(0,0,0,0.05); border-radius:12px; padding:2px;">
+                            <button id="btn-view-grid" class="toggle-btn active" title="Grid View">⊞</button>
+                            <button id="btn-view-timeline" class="toggle-btn" title="Timeline View">📅</button>
                         </div>
+                    </div>
                 </div>
 
-                <div class="search-bar-container" style="width:100%; max-width:400px;">
-                    <div class="glass-panel" style="display:flex; align-items:center; padding:0 12px; height:40px; background:rgba(255,255,255,0.5); border-radius:12px;">
+                <!-- Expanded Filter Bar -->
+                <div class="filter-bar" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:4px; align-items:center;">
+                    
+                    <!-- Search -->
+                    <div class="glass-panel" style="display:flex; align-items:center; padding:0 12px; height:40px; background:rgba(255,255,255,0.5); border-radius:12px; min-width:180px;">
                         <span style="font-size:1rem; opacity:0.5; margin-right:8px;">🔍</span>
                         <input type="text" id="search-input" placeholder="${i18n.t('ai.inputPlaceholder') || 'Search...'}" 
                             style="border:none; background:transparent; font-size:0.9rem; width:100%; outline:none; height:100%; padding:0; color:var(--text-primary);">
                     </div>
+
+                    <!-- Category -->
+                    <select id="filter-category" title="Category" style="height:40px; padding:0 16px; border-radius:12px; border:none; background:rgba(255,255,255,0.5);">
+                        ${catOptions}
+                    </select>
+
+                    <!-- Occasion (Gift Mode) -->
+                    <select id="filter-occasion" title="Occasion" style="height:40px; padding:0 16px; border-radius:12px; border:none; background:rgba(255,255,255,0.5);">
+                        <option value="All" disabled selected>🎉 Occasion</option>
+                        ${occOptions}
+                    </select>
+
+                    <!-- Price Range -->
+                    <div class="glass-panel" style="display:flex; align-items:center; padding:0 8px; height:40px; background:rgba(255,255,255,0.5); border-radius:12px; gap:4px;">
+                        <input type="number" id="filter-price-min" placeholder="Min" style="width:50px; border:none; background:transparent; font-size:0.8rem; text-align:center;">
+                        <span style="opacity:0.3">-</span>
+                        <input type="number" id="filter-price-max" placeholder="Max" style="width:50px; border:none; background:transparent; font-size:0.8rem; text-align:center;">
+                    </div>
+
+                    <!-- Status Toggle (Archive) -->
+                    <button id="btn-archive-toggle" class="toggle-btn" title="Show Archived" style="height:40px; padding:0 16px; border-radius:12px; background:rgba(255,255,255,0.5);">📦 Archived</button>
+
+                    <!-- Sale -->
+                    <button id="btn-sale-filter" class="toggle-btn" title="${i18n.t('home.sale_filter')}" style="height:40px; padding:0 16px; border-radius:12px; background:rgba(255,255,255,0.5);">% Sale</button>
                 </div>
             </div>
             
@@ -115,10 +160,11 @@ export const HomeView = {
     afterRender: async () => {
         if (!addItemModal) addItemModal = new AddItemModal(() => HomeView.loadData());
 
-        // 1. Bind Static Events
+        // 1. Bind Events
         document.getElementById('fab-add-wish').onclick = () => addItemModal.open();
         document.getElementById('btn-run-tutorial').onclick = () => window.runTutorial();
 
+        // Share
         document.getElementById('btn-share-list').onclick = () => {
             const user = authService.currentUser;
             const profile = authService.userProfile;
@@ -127,16 +173,79 @@ export const HomeView = {
             navigator.clipboard.writeText(url).then(() => window.showToast(i18n.t('home.share_copy'), "🔗"));
         };
 
-        document.getElementById('btn-sale-filter').onclick = (e) => {
-            showSaleOnly = !showSaleOnly;
-            e.target.classList.toggle('active', showSaleOnly);
+        // --- FILTER BINDINGS ---
+        const bindFilter = (id, key, type = 'value') => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener(type === 'click' ? 'click' : 'input', (e) => {
+                if (type === 'click') {
+                    // Toggle boolean
+                    currentFilters[key] = !currentFilters[key];
+                    e.target.classList.toggle('active', currentFilters[key]);
+                    // Visual feedback
+                    e.target.style.background = currentFilters[key] ? 'var(--text-primary)' : 'rgba(255,255,255,0.5)';
+                    e.target.style.color = currentFilters[key] ? 'white' : 'var(--text-secondary)';
+                } else {
+                    currentFilters[key] = e.target.value === 'All' ? 'All' : e.target.value;
+                    if (key === 'priceMin' || key === 'priceMax') {
+                        currentFilters[key] = e.target.value ? parseFloat(e.target.value) : null;
+                    }
+                }
+                HomeView.renderGrid();
+            });
+        };
+
+        bindFilter('search-input', 'search');
+        bindFilter('filter-category', 'category');
+        bindFilter('filter-occasion', 'occasion', 'input'); // Select uses 'change'/'input'
+
+        const occSelect = document.getElementById('filter-occasion');
+        if (occSelect) {
+            occSelect.onchange = (e) => {
+                currentFilters.occasion = e.target.value;
+                HomeView.renderGrid();
+            };
+        }
+
+        bindFilter('filter-price-min', 'priceMin');
+        bindFilter('filter-price-max', 'priceMax');
+
+        bindFilter('btn-sale-filter', 'saleOnly', 'click');
+
+        // Archive Toggle
+        const btnArchive = document.getElementById('btn-archive-toggle');
+        if (btnArchive) {
+            btnArchive.onclick = () => {
+                if (currentFilters.status === 'wish') {
+                    currentFilters.status = 'archived';
+                    btnArchive.classList.add('active');
+                    btnArchive.style.background = 'var(--text-primary)';
+                    btnArchive.style.color = 'white';
+                    btnArchive.textContent = 'Active Wishes';
+                } else {
+                    currentFilters.status = 'wish';
+                    btnArchive.classList.remove('active');
+                    btnArchive.style.background = 'rgba(255,255,255,0.5)';
+                    btnArchive.style.color = 'var(--text-secondary)';
+                    btnArchive.textContent = '📦 Archived';
+                }
+                HomeView.renderGrid();
+            };
+        }
+
+        // View Toggles
+        const btnGrid = document.getElementById('btn-view-grid');
+        const btnTimeline = document.getElementById('btn-view-timeline');
+
+        const setView = (mode) => {
+            currentFilters.viewMode = mode;
+            btnGrid.classList.toggle('active', mode === 'grid');
+            btnTimeline.classList.toggle('active', mode === 'timeline');
             HomeView.renderGrid();
         };
 
-        document.getElementById('search-input').addEventListener('input', (e) => {
-            currentSearchTerm = e.target.value.toLowerCase().trim();
-            HomeView.renderGrid();
-        });
+        btnGrid.onclick = () => setView('grid');
+        btnTimeline.onclick = () => setView('timeline');
 
         // Planner Logic
         const plannerModal = document.getElementById('planner-modal');
@@ -157,7 +266,6 @@ export const HomeView = {
             resultsDiv.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
 
             try {
-                // Fetch again to be safe or use itemsMap
                 const items = Array.from(itemsMap.values());
                 const data = await apiCall('/api/ai/purchase-planner', 'POST', { wishlistItems: items, budget, currency: 'TRY' });
                 authService.trackFeatureUsage(FEATURES.AI_PLANNER);
@@ -170,7 +278,7 @@ export const HomeView = {
             } catch (error) { resultsDiv.innerHTML = `<p style="color:#ff3b30">Error: ${error.message}</p>`; }
         };
 
-        // 2. Setup Tutorial Helper (Global because it recurses)
+        // 2. Setup Tutorial Helper
         window.runTutorial = async () => {
             const steps = [
                 { el: '#fab-add-wish', text: "Start here! Add your first wish." },
@@ -224,17 +332,20 @@ export const HomeView = {
 
         try {
             const [items, closetItems] = await Promise.all([
+                // Fetch ALL items for this user (including archived) then filter in memory
                 firestoreService.getWishlist(user.uid, user.uid),
                 firestoreService.getCloset(user.uid)
             ]);
 
             itemsMap.clear();
-            items.forEach(item => itemsMap.set(item.id, item));
+            items.forEach(item => {
+                // We keep all items in the map so we can switch between status='wish' and status='archived'
+                itemsMap.set(item.id, item);
+            });
 
             GamificationService.checkMilestones('add_item', items.length);
             GamificationService.checkMilestones('manifest', closetItems.length);
 
-            // Planner Button State
             const plannerBtn = document.getElementById('btn-planner');
             if (plannerBtn) {
                 const canUse = items.length >= 3;
@@ -242,15 +353,11 @@ export const HomeView = {
                 plannerBtn.style.cursor = canUse ? 'pointer' : 'not-allowed';
             }
 
-            // Auto Tutorial
             if (authService.userProfile && !authService.userProfile.tutorialSeen) {
                 setTimeout(() => window.runTutorial(), 800);
             }
 
-            // Sidebar Ads & Activity
             HomeView.setupSidebars(user);
-
-            // Render Content
             HomeView.renderGrid();
 
         } catch (error) {
@@ -266,7 +373,6 @@ export const HomeView = {
         const activityContainer = document.getElementById('activity-log-container');
         const activityList = document.getElementById('activity-list');
 
-        // 1. Visibility based on width
         if (window.innerWidth > 1000) {
             rightCol.style.display = 'flex';
             const activities = await firestoreService.getRecentActivities(user.uid);
@@ -284,9 +390,7 @@ export const HomeView = {
             }
         }
 
-        // 2. Ads
         if (!authService.isPremium) {
-            // Mock or Real, config handles it
             if (window.innerWidth > 1300) {
                 leftCol.style.display = 'flex';
                 leftCol.innerHTML = '';
@@ -307,69 +411,146 @@ export const HomeView = {
 
         let displayItems = Array.from(itemsMap.values());
 
-        // Filter
-        if (showSaleOnly) displayItems = displayItems.filter(item => item.onSale);
-        if (currentSearchTerm) {
+        // --- APPLY FILTERS ---
+
+        // 1. Status (Wish vs Archived)
+        displayItems = displayItems.filter(item => {
+            if (currentFilters.status === 'archived') return item.status === 'archived';
+            return item.status === 'wish';
+        });
+
+        // 2. Sale
+        if (currentFilters.saleOnly) {
+            displayItems = displayItems.filter(item => item.onSale);
+        }
+
+        // 3. Category
+        if (currentFilters.category !== 'All') {
+            displayItems = displayItems.filter(item => item.category === currentFilters.category);
+        }
+
+        // 4. Occasion
+        if (currentFilters.occasion !== 'All') {
+            displayItems = displayItems.filter(item => item.occasion === currentFilters.occasion);
+        }
+
+        // 5. Price Range
+        if (currentFilters.priceMin !== null) {
+            displayItems = displayItems.filter(item => item.price >= currentFilters.priceMin);
+        }
+        if (currentFilters.priceMax !== null) {
+            displayItems = displayItems.filter(item => item.price <= currentFilters.priceMax);
+        }
+
+        // 6. Search
+        if (currentFilters.search) {
+            const term = currentFilters.search;
             displayItems = displayItems.filter(item =>
-                (item.title && item.title.toLowerCase().includes(currentSearchTerm)) ||
-                (item.category && item.category.toLowerCase().includes(currentSearchTerm))
+                (item.title && item.title.toLowerCase().includes(term)) ||
+                (item.category && item.category.toLowerCase().includes(term))
             );
         }
 
         if (displayItems.length === 0) {
-            if (!showSaleOnly && !currentSearchTerm) {
+            // ... (Empty state logic) ...
+            if (!currentFilters.saleOnly && !currentFilters.search && currentFilters.category === 'All' && currentFilters.status === 'wish') {
                 container.innerHTML = `
                     <div class="glass-panel empty-state-card">
                         <span class="empty-icon">💭</span>
                         <h2 class="empty-title">${i18n.t('home.empty')}</h2>
                         <div class="empty-actions">
-                            <button class="btn-primary" onclick="window.openAddModal()">+ ${i18n.t('home.addBtn')}</button>
+                            <button class="btn-primary" onclick="window.addItemModal.open()">+ ${i18n.t('home.addBtn')}</button>
                         </div>
                     </div>`;
             } else {
-                container.innerHTML = `<div class="empty-state"><p>No matches found.</p></div>`;
+                container.innerHTML = `<div class="empty-state"><p>No matches found in ${currentFilters.status === 'wish' ? 'Wishlist' : 'Archive'}.</p></div>`;
             }
             return;
         }
 
-        let gridHtml = '';
-        displayItems.forEach((item, index) => {
-            gridHtml += HomeView.renderCard(item);
-            // Mobile inline ad
-            if (!authService.isPremium && window.innerWidth <= 1000 && (index + 1) % 4 === 0) {
-                const ad = new AdSlot({ provider: 'mock', height: '250px' });
-                gridHtml += `<div class="ad-wrapper">${ad.getElement().outerHTML}</div>`;
+        // --- RENDER MODE ---
+        if (currentFilters.viewMode === 'timeline') {
+            HomeView.renderTimeline(container, displayItems);
+        } else {
+            let gridHtml = '';
+            displayItems.forEach((item, index) => {
+                gridHtml += HomeView.renderCard(item);
+                if (!authService.isPremium && window.innerWidth <= 1000 && (index + 1) % 4 === 0) {
+                    const ad = new AdSlot({ provider: 'mock', height: '250px' });
+                    gridHtml += `<div class="ad-wrapper">${ad.getElement().outerHTML}</div>`;
+                }
+            });
+            container.innerHTML = `<div class="masonry-grid">` + gridHtml + `</div>`;
+            HomeView.bindCardEvents(container);
+        }
+    },
+
+    renderTimeline: (container, items) => {
+        // Sort by Target Date
+        const datedItems = items.filter(i => i.targetDate).sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
+        const undatedItems = items.filter(i => !i.targetDate);
+
+        let html = `<div class="timeline-container">`;
+
+        // Group by Month
+        let currentMonth = '';
+        datedItems.forEach(item => {
+            const date = new Date(item.targetDate);
+            const monthStr = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+            if (monthStr !== currentMonth) {
+                currentMonth = monthStr;
+                html += `<div class="timeline-group"><div class="timeline-header">${currentMonth}</div>`;
             }
+
+            // Render Wide Card
+            const catConfig = CATEGORIES[item.category] || CATEGORIES['Other'];
+            const icon = catConfig.icon || '📦';
+            const day = date.getDate();
+
+            html += `
+                <div class="timeline-item glass-panel" style="display:flex; align-items:center; padding:16px; gap:16px;">
+                    <div style="background:rgba(0,0,0,0.05); padding:8px 12px; border-radius:12px; text-align:center; min-width:60px;">
+                        <span style="font-size:1.2rem; font-weight:700; display:block;">${day}</span>
+                        <span style="font-size:0.7rem; text-transform:uppercase;">Due</span>
+                    </div>
+                    <img src="${item.imageUrl}" style="width:60px; height:60px; border-radius:12px; object-fit:cover;">
+                    <div style="flex:1;">
+                        <h4 style="margin:0;">${item.title}</h4>
+                        <div style="font-size:0.85rem; color:var(--text-secondary);">${item.price} ${item.currency}</div>
+                    </div>
+                    <button class="btn-text edit-btn" data-id="${item.id}" style="font-size:1.2rem;">✎</button>
+                </div>
+            `;
         });
 
-        container.innerHTML = `<div class="masonry-grid">` + gridHtml + `</div>`;
+        if (datedItems.length > 0) html += `</div>`; // Close last group
 
-        // Card Action Bindings
-        container.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                window.handleDeleteItem(btn.closest('.card').dataset.id);
-            };
-        });
-        container.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                window.handleEditItem(btn.closest('.card').dataset.id);
-            };
-        });
-        container.querySelectorAll('.closet-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                window.handleMoveToCloset(btn.closest('.card').dataset.id);
-            };
-        });
-        // Ad Remove Link
-        container.querySelectorAll('.remove-ads-link').forEach(el => {
-            el.onclick = (e) => { e.stopPropagation(); premiumModal.open(); };
-        });
+        // Undated
+        if (undatedItems.length > 0) {
+            html += `<div class="timeline-group"><div class="timeline-header">Someday</div>`;
+            undatedItems.forEach(item => {
+                html += `
+                    <div class="timeline-item glass-panel" style="display:flex; align-items:center; padding:16px; gap:16px; opacity:0.8;">
+                        <div style="width:60px; text-align:center; font-size:1.5rem;">∞</div>
+                        <img src="${item.imageUrl}" style="width:50px; height:50px; border-radius:12px; object-fit:cover;">
+                        <div style="flex:1;">
+                            <h4 style="margin:0;">${item.title}</h4>
+                        </div>
+                        <button class="btn-text edit-btn" data-id="${item.id}">✎</button>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+
+        html += `</div>`; // Close container
+        container.innerHTML = html;
+        HomeView.bindCardEvents(container); // Re-bind edit buttons
     },
 
     renderCard: (item) => {
+        // ... (Same as original) ...
         const catConfig = CATEGORIES[item.category] || CATEGORIES['Other'];
         const icon = catConfig.icon || '📦';
         const timeData = getCountdown(item.targetDate);
@@ -377,6 +558,7 @@ export const HomeView = {
         let badges = '';
         if (timeData) badges += `<span class="time-tag ${timeData.class}">⏳ ${timeData.text}</span>`;
         if (item.visibility === 'private') badges += `<span class="time-tag tag-far" style="margin-left:4px;">🔒</span>`;
+        if (item.occasion) badges += `<span class="time-tag tag-far" style="margin-left:4px;">🎉 ${item.occasion}</span>`;
 
         return `
             <article class="glass-panel card" data-id="${item.id}">
@@ -399,5 +581,53 @@ export const HomeView = {
                 </div>
             </article>
         `;
+    },
+
+    bindCardEvents: (container) => {
+        container.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const id = btn.closest('.card') ? btn.closest('.card').dataset.id : btn.dataset.id;
+                if (id) window.handleDeleteItem(id);
+            };
+        });
+        container.querySelectorAll('.edit-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const id = btn.closest('.card') ? btn.closest('.card').dataset.id : btn.dataset.id;
+                if (id) window.handleEditItem(id);
+            };
+        });
+        container.querySelectorAll('.closet-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                const id = btn.closest('.card') ? btn.closest('.card').dataset.id : btn.dataset.id;
+                if (id) window.handleMoveToCloset(id);
+            };
+        });
+        container.querySelectorAll('.remove-ads-link').forEach(el => {
+            el.onclick = (e) => { e.stopPropagation(); premiumModal.open(); };
+        });
     }
+};
+
+// Global Handlers
+window.handleDeleteItem = async (id) => {
+    if (confirm(i18n.t('common.confirm'))) {
+        aiService.triggerReaction('delete_wish');
+        await firestoreService.deleteItem(id);
+        HomeView.loadData();
+    }
+};
+
+window.handleEditItem = async (id) => {
+    const item = itemsMap.get(id);
+    if (item && addItemModal) addItemModal.open(item);
+};
+
+window.handleMoveToCloset = async (id) => {
+    aiService.triggerReaction('manifest', itemsMap.get(id));
+    GamificationService.triggerConfetti();
+    await firestoreService.markAsOwned(id);
+    HomeView.loadData();
 };
