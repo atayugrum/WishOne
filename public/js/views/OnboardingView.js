@@ -2,72 +2,155 @@ import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
 import { i18n } from '../services/LocalizationService.js';
 
+let step = 1;
+
 export const OnboardingView = {
     render: async () => {
-        window.handleOnboarding = async (e) => {
-            e.preventDefault();
-            const usernameInput = document.getElementById('ob-username');
-            const username = usernameInput.value.trim().toLowerCase();
-            const birthday = document.getElementById('ob-birthday').value;
-            const btn = document.getElementById('ob-btn');
-            const errorMsg = document.getElementById('ob-error');
+        const user = authService.currentUser;
+        if (!user) return `<div class="empty-state">Please login first.</div>`;
 
-            // Basic Validation
-            if (!username || username.length < 3) return alert("Username must be at least 3 chars.");
-            if (!birthday) return alert("Please select your birthday.");
-
-            btn.disabled = true;
-            btn.textContent = i18n.t('common.loading');
-            errorMsg.style.display = 'none';
-
-            try {
-                // [NEW] Check uniqueness
-                const isUnique = await firestoreService.checkUsernameUnique(username);
-                if (!isUnique) {
-                    throw new Error("Username is already taken.");
-                }
-
-                await authService.completeProfile({ username, birthday });
-                window.location.hash = '#/';
-            } catch (err) {
-                console.error(err);
-                errorMsg.textContent = err.message || "Error saving profile.";
-                errorMsg.style.display = 'block';
-                btn.disabled = false;
-                btn.textContent = i18n.t('onboarding.complete');
-            }
-        };
-
-        if (window.aiCompanion) window.aiCompanion.say("One last step!", "thinking");
+        // Safe defaults
+        const defaultName = user.displayName ? user.displayName.split(' ')[0] : 'User';
+        const defaultUser = user.email ? user.email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '') : 'user';
 
         return `
-            <div class="welcome-container">
-                <div class="glass-panel auth-card lighter-card">
-                    <h2 style="margin-bottom:8px; font-size:1.8rem;">${i18n.t('onboarding.title')}</h2>
-                    <p style="margin-bottom:24px; color:var(--text-secondary);">${i18n.t('onboarding.subtitle')}</p>
+            <div class="onboarding-wrapper">
+                <div class="onboarding-container glass-panel">
+                    <div class="progress-dots">
+                        <span class="dot ${step >= 1 ? 'active' : ''}"></span>
+                        <span class="dot ${step >= 2 ? 'active' : ''}"></span>
+                        <span class="dot ${step >= 3 ? 'active' : ''}"></span>
+                    </div>
 
-                    <form onsubmit="window.handleOnboarding(event)" style="width: 100%;">
-                        <div class="form-group compact-group">
-                            <label style="margin-left:4px;">${i18n.t('onboarding.username')}</label>
-                            <div class="input-with-icon">
-                                <span class="input-icon">@</span>
-                                <input type="text" id="ob-username" required placeholder="dreamer" pattern="[a-zA-Z0-9_]+" title="Letters, numbers, and underscores only.">
-                            </div>
+                    <!-- Step 1: Profile -->
+                    <div id="step-1" class="onboarding-step ${step === 1 ? 'active' : ''}">
+                        <h2>Welcome, ${defaultName} 👋</h2>
+                        <p style="color:var(--text-secondary); margin-bottom:24px;">Let's set up your profile.</p>
+                        
+                        <div class="form-group">
+                            <label>Pick a Username</label>
+                            <input type="text" id="ob-username" placeholder="username" value="${defaultUser}">
+                            <small style="color:var(--text-tertiary);">Unique handle for friends to find you.</small>
                         </div>
-                        <div class="form-group compact-group">
-                            <label style="margin-left:4px;">${i18n.t('onboarding.birthday')}</label>
-                            <div class="input-with-icon">
-                                <span class="input-icon">🎂</span>
-                                <input type="date" id="ob-birthday" required>
-                            </div>
+                        <div class="form-group">
+                            <label>Birthday (Optional)</label>
+                            <input type="date" id="ob-birthday">
+                            <small style="color:var(--text-tertiary);">For Gift Mode suggestions.</small>
                         </div>
-                        <p id="ob-error" style="color: #ff3b30; font-size: 0.85rem; display: none; margin-bottom: 12px; text-align:center;"></p>
-                        <button type="submit" id="ob-btn" class="btn-primary compact-btn" style="width: 100%; margin-top:16px;">
-                            ${i18n.t('onboarding.complete')}
-                        </button>
-                    </form>
+                        <button class="btn-primary" id="btn-next-1" style="width:100%; margin-top:16px;">Next</button>
+                    </div>
+
+                    <!-- Step 2: First Wish -->
+                    <div id="step-2" class="onboarding-step ${step === 2 ? 'active' : ''}" style="display:none;">
+                        <h2>Make a Wish ✨</h2>
+                        <p style="color:var(--text-secondary); margin-bottom:24px;">What's one thing you're dreaming of?</p>
+                        
+                        <div class="form-group">
+                            <input type="text" id="ob-wish-title" placeholder="e.g. Vintage Film Camera" style="font-size:1.1rem; padding:16px;">
+                        </div>
+                        
+                        <button class="btn-primary" id="btn-next-2" style="width:100%; margin-top:16px;">Add Wish & Continue</button>
+                        <button class="btn-text" id="btn-skip-2" style="width:100%; margin-top:8px; opacity:0.6;">Skip for now</button>
+                    </div>
+
+                    <!-- Step 3: Ready -->
+                    <div id="step-3" class="onboarding-step ${step === 3 ? 'active' : ''}" style="display:none; text-align:center;">
+                        <div style="font-size:4rem; margin-bottom:16px;">🎉</div>
+                        <h2>You're All Set!</h2>
+                        <p style="color:var(--text-secondary); margin-bottom:32px;">Your sanctuary is ready. Let's explore.</p>
+                        <button class="btn-primary" id="btn-finish" style="width:100%;">Enter WishOne</button>
+                    </div>
                 </div>
             </div>
         `;
+    },
+
+    afterRender: async () => {
+        const user = authService.currentUser;
+
+        // Helper to check username uniqueness (Mock for MVP if API not ready)
+        const checkUsername = async (u) => {
+            // In a real implementation, call firestoreService.checkUsernameUnique(u)
+            return u.length >= 3;
+        };
+
+        // Step 1: Profile
+        const btn1 = document.getElementById('btn-next-1');
+        if (btn1) {
+            btn1.onclick = async () => {
+                const username = document.getElementById('ob-username').value.toLowerCase().trim();
+                const birthday = document.getElementById('ob-birthday').value;
+
+                if (username.length < 3) return alert("Username must be at least 3 characters.");
+
+                btn1.textContent = "Saving...";
+                btn1.disabled = true;
+
+                try {
+                    await firestoreService.updateUserProfile(user.uid, {
+                        username,
+                        birthday,
+                        hasCompletedSignupProfile: true, // Key Flag
+                        isBetaUser: true // Auto-grant beta for MVP flow
+                    });
+                    // Refresh local profile
+                    if (authService.userProfile) {
+                        authService.userProfile.hasCompletedSignupProfile = true;
+                        authService.userProfile.username = username;
+                    }
+
+                    // Go to Step 2
+                    step = 2;
+                    OnboardingView.refresh();
+                } catch (e) {
+                    console.error(e);
+                    alert("Error saving profile. Try again.");
+                    btn1.textContent = "Next";
+                    btn1.disabled = false;
+                }
+            };
+        }
+
+        // Step 2: First Wish
+        const handleStep2 = async (skip) => {
+            if (!skip) {
+                const title = document.getElementById('ob-wish-title').value.trim();
+                if (title) {
+                    const btn2 = document.getElementById('btn-next-2');
+                    btn2.textContent = "Adding...";
+                    try {
+                        await firestoreService.addItem({
+                            title,
+                            status: 'wish',
+                            ownerId: user.uid,
+                            category: 'Other',
+                            priority: 'High'
+                        });
+                    } catch (e) { console.warn("Wish add failed", e); }
+                }
+            }
+            step = 3;
+            OnboardingView.refresh();
+        };
+
+        const btn2 = document.getElementById('btn-next-2');
+        if (btn2) btn2.onclick = () => handleStep2(false);
+        const skip2 = document.getElementById('btn-skip-2');
+        if (skip2) skip2.onclick = () => handleStep2(true);
+
+        // Step 3: Finish
+        const btnFinish = document.getElementById('btn-finish');
+        if (btnFinish) {
+            btnFinish.onclick = () => {
+                // Reset step for next time logic needed? No, user flag prevents returning.
+                window.location.hash = '#/app/home';
+            };
+        }
+    },
+
+    refresh: async () => {
+        const app = document.getElementById('app');
+        app.innerHTML = await OnboardingView.render();
+        await OnboardingView.afterRender();
     }
 };

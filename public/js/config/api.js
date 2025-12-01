@@ -2,14 +2,10 @@
 
 const getBaseUrl = () => {
     const host = window.location.hostname;
-
-    // 1. Local Development
     if (host === 'localhost' || host === '127.0.0.1') {
-        return 'http://localhost:3001'; // <--- CONFIRMED 3001
+        return 'http://localhost:3001'; // Local Functions Emulator
     }
-
-    // 2. Production (Relative path for same-domain hosting)
-    return '';
+    return ''; // Production (same origin)
 };
 
 export const API_BASE_URL = getBaseUrl();

@@ -3,96 +3,91 @@ import { i18n } from '../services/LocalizationService.js';
 
 export class Header {
     constructor() {
-        this.element = document.createElement('header');
-        this.element.className = 'floating-header';
-        this.element.style.display = 'none';
-        this.render();
-        this.bindEvents();
-        this.loadTheme(); // [NEW] Load saved theme
+        this.element = null;
     }
 
-    show() { this.element.style.display = 'flex'; }
-    hide() { this.element.style.display = 'none'; }
+    mount(selector) {
+        this.element = document.querySelector(selector);
+        this.render();
+    }
 
     render() {
-        const currentLang = i18n.lang.toUpperCase();
+        const user = authService.currentUser;
+        const profile = authService.userProfile;
 
-        this.element.innerHTML = `
-            <div class="logo" style="display:flex; align-items:center; gap:12px;">
-                <img src="img/icon.png" alt="WishOne" class="brand-logo-small" onerror="this.style.display='none'">
-                <span class="logo-text" style="font-weight:700; font-size:1.2rem; letter-spacing:-0.5px;">WishOne</span>
-            </div>
+        // [FIX] Add safe check for user before accessing properties
+        const userInitial = (user && user.displayName) ? user.displayName.charAt(0).toUpperCase() : '?';
+        const photoURL = (profile && profile.photoURL) ? profile.photoURL : 'https://placehold.co/100';
 
-            <nav class="nav-pills">
-                <a href="#/" class="nav-link active" data-path="/">${i18n.t('nav.home')}</a>
-                <a href="#/friends" class="nav-link" data-path="/friends">${i18n.t('nav.friends')}</a>
-                <a href="#/inspo" class="nav-link" data-path="/inspo">${i18n.t('nav.inspo')}</a>
-                <a href="#/closet" class="nav-link" data-path="/closet">${i18n.t('nav.closet')}</a>
-                <a href="#/combos" class="nav-link" data-path="/combos">${i18n.t('nav.combos') || 'Combos'}</a>
-            </nav>
+        const html = `
+            <header class="floating-header">
+                <div class="header-left">
+                    <img src="img/logo.png" alt="WishOne" class="brand-logo-small">
+                </div>
+                
+                <nav class="header-nav">
+                    <div class="nav-pills">
+                        <a href="#/" class="nav-link" data-link>${i18n.t('nav.home')}</a>
+                        <a href="#/inspo" class="nav-link" data-link>${i18n.t('nav.inspo')}</a>
+                        <a href="#/closet" class="nav-link" data-link>${i18n.t('nav.closet')}</a>
+                        <a href="#/combos" class="nav-link" data-link>${i18n.t('nav.combos')}</a>
+                        <a href="#/friends" class="nav-link" data-link>${i18n.t('nav.friends')}</a>
+                    </div>
+                </nav>
 
-            <div class="header-actions">
-                <button id="toggle-lang" class="btn-text" style="font-size: 0.8rem; font-weight: 700;">
-                    ${currentLang}
-                </button>
-
-                <button id="toggle-love" class="icon-btn" title="Toggle Theme">❤️</button>
-                <div id="auth-container"></div>
-            </div>
+                <div class="header-actions">
+                    ${user ? `
+                        <div class="user-avatar" onclick="window.location.hash='#/profile'">
+                            ${profile && profile.photoURL ?
+                    `<img src="${photoURL}" alt="Profile">` :
+                    `<div style="width:100%; height:100%; background:var(--accent-color); color:white; display:flex; align-items:center; justify-content:center; font-weight:700;">${userInitial}</div>`
+                }
+                        </div>
+                        <button class="icon-btn" onclick="window.location.hash='#/settings'" title="${i18n.t('nav.settings')}">⚙️</button>
+                    ` : `
+                        <a href="#/welcome" class="nav-link">Login</a>
+                    `}
+                </div>
+            </header>
         `;
+
+        if (this.element) {
+            // Check if header already exists to avoid dupes
+            const existing = document.querySelector('.floating-header');
+            if (existing) existing.remove();
+
+            // Insert at top of body
+            document.body.insertAdjacentHTML('afterbegin', html);
+
+            // Bind Logic
+            this.bindEvents();
+        }
     }
 
     bindEvents() {
-        this.element.querySelector('#toggle-lang').addEventListener('click', () => {
-            i18n.toggle();
-        });
-
-        this.element.querySelector('#toggle-love').addEventListener('click', () => {
-            document.body.classList.toggle('mode-love');
-            // [NEW] Persist choice
-            const isLove = document.body.classList.contains('mode-love');
-            localStorage.setItem('wishone_theme', isLove ? 'love' : 'default');
-        });
-
-        document.addEventListener('route-changed', (e) => {
-            const currentPath = e.detail.route;
-            const links = this.element.querySelectorAll('.nav-link');
-            links.forEach(link => {
-                if (link.dataset.path === currentPath) link.classList.add('active');
+        // Active Link Logic
+        const updateActive = () => {
+            const hash = window.location.hash || '#/';
+            document.querySelectorAll('.nav-link').forEach(link => {
+                if (link.getAttribute('href') === hash) link.classList.add('active');
                 else link.classList.remove('active');
             });
-        });
-
-        const authContainer = this.element.querySelector('#auth-container');
-        authContainer.addEventListener('click', (e) => {
-            if (e.target.closest('.user-avatar')) {
-                window.location.hash = '#/profile';
-            }
-        });
-    }
-
-    loadTheme() {
-        const theme = localStorage.getItem('wishone_theme');
-        if (theme === 'love') {
-            document.body.classList.add('mode-love');
-        }
+        };
+        window.addEventListener('hashchange', updateActive);
+        updateActive();
     }
 
     updateUser(user) {
-        const container = this.element.querySelector('#auth-container');
-        if (user) {
-            const photoURL = authService.userProfile?.photoURL || user.photoURL;
-            container.innerHTML = `
-                <div class="user-avatar">
-                    <img src="${photoURL}" alt="${user.displayName}">
-                </div>
-            `;
-        } else {
-            container.innerHTML = '';
-        }
+        this.render();
     }
 
-    mount(parentSelector) {
-        document.querySelector(parentSelector).prepend(this.element);
+    hide() {
+        const el = document.querySelector('.floating-header');
+        if (el) el.style.display = 'none';
+    }
+
+    show() {
+        const el = document.querySelector('.floating-header');
+        if (el) el.style.display = 'flex';
     }
 }

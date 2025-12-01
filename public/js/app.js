@@ -1,146 +1,86 @@
 import { Router } from './utils/Router.js';
-import { Header } from './components/Header.js';
+import { AppShell } from './views/AppShell.js';
 import { HomeView } from './views/HomeView.js';
-import { WelcomeView } from './views/WelcomeView.js';
+import { WishlistView } from './views/WishlistView.js'; // [NEW]
+import { LandingView } from './views/LandingView.js';
 import { OnboardingView } from './views/OnboardingView.js';
-import { FriendsView } from './views/FriendsView.js';
-import { FriendWishlistView } from './views/FriendWishlistView.js';
-import { PublicWishlistView } from './views/PublicWishlistView.js';
 import { InspoView } from './views/InspoView.js';
 import { ClosetView } from './views/ClosetView.js';
 import { ComboView } from './views/ComboView.js';
+import { FriendsView } from './views/FriendsView.js';
 import { ProfileView } from './views/ProfileView.js';
+import { SettingsView } from './views/SettingsView.js';
 import { authService } from './services/AuthService.js';
-import { firestoreService } from './services/FirestoreService.js';
+import { settingsService } from './services/SettingsService.js';
 import { LogService } from './services/LogService.js';
 import { AICompanion } from './components/AICompanion.js';
-import { aiService } from './services/AIService.js';
 import './utils/Toast.js';
 
 const routes = {
-    '/': HomeView,
-    '/welcome': WelcomeView,
+    '/': LandingView,
     '/onboarding': OnboardingView,
-    '/friends': FriendsView,
-    '/friend-wishlist': FriendWishlistView,
-    '/share': PublicWishlistView,
-    '/inspo': InspoView,
-    '/closet': ClosetView,
-    '/combos': ComboView,
-    '/profile': ProfileView,
-    '404': { template: '<h1>404 - Not Found</h1>' }
+
+    // Authenticated Routes (Wrapped in Shell)
+    '/app/home': {
+        render: () => AppShell.render(HomeView),
+        afterRender: () => AppShell.afterRender(HomeView)
+    },
+    // [FIX] Now pointing to separate WishlistView
+    '/app/wishlist': {
+        render: () => AppShell.render(WishlistView),
+        afterRender: () => AppShell.afterRender(WishlistView)
+    },
+    '/app/inspo': {
+        render: () => AppShell.render(InspoView),
+        afterRender: () => AppShell.afterRender(InspoView)
+    },
+    '/app/closet': {
+        render: () => AppShell.render(ClosetView),
+        afterRender: () => AppShell.afterRender(ClosetView)
+    },
+    '/app/combos': {
+        render: () => AppShell.render(ComboView),
+        afterRender: () => AppShell.afterRender(ComboView)
+    },
+    '/app/friends': {
+        render: () => AppShell.render(FriendsView),
+        afterRender: () => AppShell.afterRender(FriendsView)
+    },
+    '/app/profile': {
+        render: () => AppShell.render(ProfileView),
+        afterRender: () => AppShell.afterRender(ProfileView)
+    },
+
+    '/settings': SettingsView,
+
+    '404': { template: '<div class="empty-state"><h1>404</h1><p>Page not found.</p><a href="#/app/home">Go Home</a></div>' }
 };
 
-const checkReminders = async (user) => {
-    try {
-        const items = await firestoreService.getWishlist(user.uid, user.uid);
-        const now = new Date();
-        const threeDays = 3 * 24 * 60 * 60 * 1000;
-
-        let dueCount = 0;
-        let urgentItem = null;
-
-        items.forEach(item => {
-            if (item.targetDate && item.status === 'wish') {
-                const target = new Date(item.targetDate);
-                const diff = target - now;
-                if (diff > 0 && diff < threeDays) {
-                    dueCount++;
-                    urgentItem = item.title;
-                }
-            }
-        });
-
-        if (dueCount > 0) {
-            const msg = dueCount === 1
-                ? `Reminder: "${urgentItem}" is due soon!`
-                : `You have ${dueCount} wishes due soon!`;
-
-            setTimeout(() => {
-                window.showToast(msg, "⏰");
-                if (window.aiCompanion) window.aiCompanion.say(msg, "thinking");
-            }, 2000);
-        }
-    } catch (e) {
-        console.warn("Reminder check failed", e);
-    }
-};
-
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     LogService.info('App Started');
+    await settingsService.init();
 
-    // [NEW] Register SW
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js')
-            .then(() => console.log('SW registered'))
-            .catch(err => console.log('SW failed', err));
-    }
-
-    const header = new Header();
-    header.mount('body');
-
-    try { window.aiCompanion = new AICompanion(); } catch (e) { console.error(e); }
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
 
     const router = new Router(routes);
 
-    const authTimeout = setTimeout(() => {
-        const app = document.getElementById('app');
-        if (app && app.innerText.includes('Loading...')) {
-            window.location.hash = '#/welcome';
-            router.handleLocation();
-        }
-    }, 3000);
-
     const routeGuard = (path, user, profile) => {
-        if (path.startsWith('/share')) return null;
-        if (!user) {
-            if (path === '/welcome') return null;
-            return '/welcome';
-        }
-        if (profile && !profile.isProfileComplete) {
-            if (path === '/onboarding') return null;
-            return '/onboarding';
-        }
-        if (path === '/welcome' || path === '/onboarding') {
-            return '/';
+        const isPublic = path === '/' || path.startsWith('/share');
+        if (!user && !isPublic) return '/';
+        if (user) {
+            if (path !== '/onboarding') {
+                if (profile && !profile.hasCompletedSignupProfile) return '/onboarding';
+            }
+            if (path === '/') return '/app/home';
         }
         return null;
     };
 
     authService.init((user, profile) => {
-        clearTimeout(authTimeout);
-
         if (user) {
-            header.updateUser(user);
-            if (profile && !profile.isProfileComplete) {
-                header.hide();
-            } else {
-                header.show();
-                if (!window.hasCheckedReminders) {
-                    checkReminders(user);
-                    window.hasCheckedReminders = true;
-                }
-            }
-        } else {
-            header.hide();
+            if (!window.aiCompanion) { try { window.aiCompanion = new AICompanion(); } catch (e) { } }
         }
-
-        if (user && profile && profile.isProfileComplete && (window.location.hash === '#/' || window.location.hash === '')) {
-            setTimeout(() => {
-                aiService.triggerReaction('login', { name: user.displayName || 'Dreamer' });
-            }, 1000);
-        }
-
         router.setGuard((path) => routeGuard(path, user, profile));
         router.handleLocation();
-    });
-
-    window.addEventListener('offline', () => {
-        if (window.aiCompanion) window.aiCompanion.say("Offline...", "error");
-        document.body.style.filter = "grayscale(0.8)";
-    });
-    window.addEventListener('online', () => {
-        if (window.aiCompanion) window.aiCompanion.say("Online!", "welcome");
-        document.body.style.filter = "";
     });
 });

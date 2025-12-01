@@ -4,37 +4,34 @@
     /* --- Typography --- */
     --font-display: 'Urbanist', sans-serif;
     --font-body: 'Inter', sans-serif;
-
     /* --- DEFAULT: Zen / Cool Palette --- */
-    --bg-color-1: #E6E6FA;
-    /* Lavender */
-    --bg-color-2: #F8C8DC;
-    /* Soft Pink */
-    --bg-color-3: #ADD8E6;
-    /* Baby Blue */
-    --bg-color-4: #FFDAB9;
-    /* Peach */
-
-    --accent-color: #007AFF;
-    /* Apple Blue */
-    --accent-glow: rgba(0, 122, 255, 0.4);
+    --bg-color-1: #e0c3fc;
+    --bg-color-2: #8ec5fc;
+    --bg-color-3: #ffffff;
+    --bg-color-4: #f3e7e9;
+    --accent-color: #6366f1;
+    --accent-glow: rgba(99, 102, 241, 0.4);
 
     --text-primary: #1D1D1F;
-    --text-secondary: #86868B;
-    --text-tertiary: #D2D2D7;
+    --text-secondary: #6e6e73;
+    --text-tertiary: #86868b;
 
     /* --- Glassmorphism --- */
     --glass-base: rgba(255, 255, 255, 0.65);
     /* Slightly more opaque for readability */
     --glass-highlight: rgba(255, 255, 255, 0.4);
-    --glass-border: rgba(255, 255, 255, 0.5);
-    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+    --glass-border: rgba(255, 255, 255, 0.8);
+    --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
     --glass-blur: blur(20px);
     --glass-radius: 24px;
 
+    --accent-color: #6366f1;
+    --accent-glow: rgba(99, 102, 241, 0.4);
+
     /* --- Motion System (Apple-like) --- */
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     --ease-ios: cubic-bezier(0.25, 1, 0.5, 1);
-    --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    --ease-fluid: cubic-bezier(0.4, 0, 0.2, 1);
     --duration-micro: 120ms;
     --duration-std: 250ms;
     --duration-long: 400ms;
@@ -61,4 +58,29 @@ body.mode-love {
     --glass-border: rgba(255, 255, 255, 0.6);
     --text-primary: #4A2C2C;
     /* Dark Brown/Red for text */
+}
+
+/* --- Dark Theme Overrides --- */
+[data-theme="dark"] {
+    --bg-color-1: #2a1b3d;
+    --bg-color-2: #1a2a40;
+    --bg-color-3: #0f0f12;
+    --bg-color-4: #1c1c1e;
+
+    --text-primary: #f5f5f7;
+    --text-secondary: #a1a1a6;
+    --text-tertiary: #636366;
+
+    --glass-base: rgba(30, 30, 30, 0.65);
+    --glass-border: rgba(255, 255, 255, 0.1);
+    --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+
+    --accent-color: #818cf8;
+    /* Lighter accent for dark mode */
+    --accent-glow: rgba(129, 140, 248, 0.3);
+}
+
+/* Base Body Transition for Theme Switch */
+body {
+    transition: background-color 0.3s ease, color 0.3s ease;
 }

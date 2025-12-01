@@ -11,6 +11,7 @@ export class AddItemModal {
         this.onItemSaved = onItemSaved;
         this.overlay = null;
         this.uploadedBase64 = null;
+        this.defaultStatus = 'wish'; // 'wish' or 'bought'
         this.render();
     }
 
@@ -28,6 +29,7 @@ export class AddItemModal {
                 <div class="modal-header"><h2 id="modal-title">${i18n.t('modal.title')}</h2><button class="close-btn">&times;</button></div>
                 
                 <form id="add-item-form">
+                    <!-- Title & Magic -->
                     <div class="form-group">
                         <label>${i18n.t('modal.what')}</label>
                         <div style="display: flex; gap: 8px;">
@@ -56,21 +58,35 @@ export class AddItemModal {
                         <p id="ai-reason-text" style="font-size:0.9rem; color:var(--text-primary); margin:0; line-height:1.4;"></p>
                     </div>
 
+                    <!-- Description -->
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="input-description" rows="2" placeholder="Details, size, color..." style="width:100%; padding:12px; border-radius:16px; border:1px solid rgba(0,0,0,0.08); background:rgba(255,255,255,0.6); font-family:var(--font-body);"></textarea>
+                    </div>
+
+                    <!-- Price -->
                     <div class="form-row">
                         <div class="form-group" style="flex:2;"><label>${i18n.t('modal.price')}</label><input type="number" name="price" id="input-price" placeholder="0" step="0.01"></div>
                         <div class="form-group" style="flex:1;"><label>Currency</label><select name="currency" id="input-currency"><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>${i18n.t('modal.occasion')}</label>
-                        <select name="occasion" id="input-occasion">
-                            <option value="">None</option>
-                            <option value="Birthday">🎂 Birthday</option>
-                            <option value="New Year">🎆 New Year</option>
-                            <option value="Anniversary">💍 Anniversary</option>
-                            <option value="Custom">✏️ Custom...</option>
-                        </select>
-                        <input type="text" id="input-custom-occasion" placeholder="${i18n.t('modal.occasion_custom')}" style="display:none; margin-top:8px;">
+                    <!-- Occasion & Lists -->
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1;">
+                            <label>${i18n.t('modal.occasion')}</label>
+                            <select name="occasion" id="input-occasion">
+                                <option value="">None</option>
+                                <option value="Birthday">🎂 Birthday</option>
+                                <option value="New Year">🎆 New Year</option>
+                                <option value="Anniversary">💍 Anniversary</option>
+                                <option value="Custom">✏️ Custom...</option>
+                            </select>
+                            <input type="text" id="input-custom-occasion" placeholder="${i18n.t('modal.occasion_custom')}" style="display:none; margin-top:8px;">
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>Lists / Tags</label>
+                            <input type="text" id="input-lists" placeholder="Summer, Tech...">
+                        </div>
                     </div>
 
                     <div class="form-group">
@@ -106,7 +122,6 @@ export class AddItemModal {
                         <label>${i18n.t('modal.image')}</label>
                         <div style="display:flex; gap:8px; align-items:center;">
                             <input type="url" id="img-input" name="imageUrl" placeholder="https://..." style="flex:1;">
-                            
                             <input type="file" id="img-upload" accept="image/*" style="display:none;">
                             <button type="button" class="btn-text" id="btn-trigger-upload" style="background:rgba(0,0,0,0.05); padding:10px; border-radius:12px;">📷</button>
                         </div>
@@ -150,19 +165,15 @@ export class AddItemModal {
         const selectCategory = (key) => {
             const pills = this.overlay.querySelectorAll('.cat-pill');
             pills.forEach(p => p.classList.remove('selected'));
-
             const selected = this.overlay.querySelector(`.cat-pill[data-cat="${key}"]`);
             if (selected) selected.classList.add('selected');
-
             this.overlay.querySelector('#hidden-category').value = key;
             this.overlay.querySelector('#custom-cat-container').style.display = key === 'Custom' ? 'block' : 'none';
         };
 
         categoryGrid.addEventListener('click', (e) => {
             const pill = e.target.closest('.cat-pill');
-            if (pill) {
-                selectCategory(pill.dataset.cat);
-            }
+            if (pill) selectCategory(pill.dataset.cat);
         });
 
         occasionSelect.addEventListener('change', (e) => {
@@ -186,7 +197,6 @@ export class AddItemModal {
                     imgUpload.value = '';
                     return;
                 }
-
                 const reader = new FileReader();
                 reader.onload = (ev) => {
                     this.uploadedBase64 = ev.target.result;
@@ -234,6 +244,7 @@ export class AddItemModal {
                 if (metaData.title) this.overlay.querySelector('#input-title').value = metaData.title;
                 if (metaData.price !== null) this.overlay.querySelector('#input-price').value = metaData.price;
                 if (metaData.currency) this.overlay.querySelector('#input-currency').value = metaData.currency;
+                if (metaData.description) this.overlay.querySelector('#input-description').value = metaData.description;
 
                 if (metaData.imageUrl) {
                     imgInput.value = metaData.imageUrl;
@@ -294,24 +305,26 @@ export class AddItemModal {
                 finalImage = this.uploadedBase64;
             }
 
-            // [NEW] Handle manual closet entry
             const isOwned = formData.get('isOwned') === 'on';
+            const listStr = document.getElementById('input-lists').value;
+            const lists = listStr ? listStr.split(',').map(s => s.trim()).filter(s => s) : [];
 
             const itemData = {
                 title: formData.get('title'),
+                description: document.getElementById('input-description').value,
                 price: parseFloat(formData.get('price')) || 0,
                 currency: formData.get('currency'),
                 category: category,
                 subcategory: formData.get('subcategory') || null,
                 priority: formData.get('priority'),
                 occasion: occasion || null,
+                lists: lists,
                 visibility: formData.get('visibility'),
                 imageUrl: finalImage,
                 targetDate: formData.get('targetDate') || null,
                 ownerId: authService.currentUser.uid,
-                originalUrl: magicInput.value || null,
-                isOwned: isOwned, // Legacy
-                status: isOwned ? 'bought' : 'wish' // New Schema
+                link: magicInput.value || null,
+                status: isOwned ? 'bought' : 'wish'
             };
 
             try {
@@ -337,7 +350,7 @@ export class AddItemModal {
         setTimeout(() => this.overlay.style.display = 'none', 300);
     }
 
-    open(itemToEdit = null) {
+    open(itemToEdit = null, options = {}) {
         this.overlay.style.display = 'flex';
         requestAnimationFrame(() => this.overlay.classList.add('active'));
 
@@ -349,6 +362,11 @@ export class AddItemModal {
         const imgInput = this.overlay.querySelector('#img-input');
         imgInput.disabled = false;
         imgInput.placeholder = "https://...";
+
+        this.overlay.querySelector('#input-description').value = '';
+        this.overlay.querySelector('#input-lists').value = '';
+        this.overlay.querySelector('#magic-url-input').value = '';
+
         this.overlay.querySelector('#file-name-display').style.display = 'none';
         this.overlay.querySelector('#img-preview').style.display = 'none';
         this.overlay.querySelector('#custom-cat-container').style.display = 'none';
@@ -359,12 +377,40 @@ export class AddItemModal {
         const pills = this.overlay.querySelectorAll('.cat-pill');
         pills.forEach(p => p.classList.remove('selected'));
 
+        // Handle default status logic (e.g. adding from Closet)
+        const ownedCheck = this.overlay.querySelector('#check-owned');
+        if (options.defaultStatus === 'bought') {
+            ownedCheck.checked = true;
+        } else {
+            ownedCheck.checked = false;
+        }
+
         if (itemToEdit) {
             this.editingId = itemToEdit.id;
             this.overlay.querySelector('#modal-title').textContent = i18n.t('modal.editTitle');
             this.overlay.querySelector('#input-title').value = itemToEdit.title;
+            this.overlay.querySelector('#input-description').value = itemToEdit.description || '';
             this.overlay.querySelector('#input-price').value = itemToEdit.price;
             this.overlay.querySelector('#input-currency').value = itemToEdit.currency;
+            this.overlay.querySelector('#input-lists').value = (itemToEdit.lists || []).join(', ');
+
+            if (itemToEdit.link || itemToEdit.originalUrl) {
+                this.overlay.querySelector('#magic-url-input').value = itemToEdit.link || itemToEdit.originalUrl;
+            }
+
+            if (itemToEdit.occasion) {
+                const occSelect = this.overlay.querySelector('#input-occasion');
+                if ([...occSelect.options].some(o => o.value === itemToEdit.occasion)) {
+                    occSelect.value = itemToEdit.occasion;
+                } else {
+                    occSelect.value = 'Custom';
+                    document.getElementById('input-custom-occasion').style.display = 'block';
+                    document.getElementById('input-custom-occasion').value = itemToEdit.occasion;
+                }
+            }
+
+            if (itemToEdit.targetDate) this.overlay.querySelector('#input-date').value = itemToEdit.targetDate;
+            if (itemToEdit.visibility) this.overlay.querySelector('#input-visibility').value = itemToEdit.visibility;
 
             if (itemToEdit.imageUrl) {
                 imgInput.value = itemToEdit.imageUrl;
@@ -380,7 +426,6 @@ export class AddItemModal {
             const radio = this.overlay.querySelector(`input[name="priority"][value="${itemToEdit.priority}"]`);
             if (radio) radio.checked = true;
 
-            const ownedCheck = this.overlay.querySelector('#check-owned');
             if (ownedCheck) ownedCheck.checked = itemToEdit.status === 'bought' || itemToEdit.isOwned;
         }
     }

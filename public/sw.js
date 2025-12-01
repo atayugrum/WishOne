@@ -1,4 +1,5 @@
-const CACHE_NAME = 'wishone-v1';
+/* public/sw.js */
+const CACHE_NAME = 'wishone-v2'; // Bumped version
 const ASSETS_TO_CACHE = [
     '/app.html',
     '/index.html',
@@ -12,6 +13,8 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+    // Force new service worker to activate immediately
+    self.skipWaiting();
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
             return cache.addAll(ASSETS_TO_CACHE);
@@ -20,17 +23,12 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-    // Only cache GET requests
     if (event.request.method !== 'GET') return;
-
-    // Skip Firestore/API requests
     if (event.request.url.includes('firestore') || event.request.url.includes('/api/')) return;
 
     event.respondWith(
         caches.match(event.request).then((cachedResponse) => {
-            // Return cached if found, else fetch
             return cachedResponse || fetch(event.request).then((response) => {
-                // If valid response, cache it for next time (dynamic caching)
                 if (response && response.status === 200 && response.type === 'basic') {
                     const responseClone = response.clone();
                     caches.open(CACHE_NAME).then((cache) => {
