@@ -1,432 +1,243 @@
+/* public/js/components/addItemModal.js */
 import { firestoreService } from '../services/FirestoreService.js';
-import { authService } from '../services/AuthService.js';
 import { CATEGORIES } from '../config/categories.js';
-import { FEATURES } from '../config/limits.js';
-import { premiumModal } from './PremiumModal.js';
+import { apiCall } from '../config/api.js';
 import { i18n } from '../services/LocalizationService.js';
-import { aiService } from '../services/AIService.js';
+import { authService } from '../services/AuthService.js';
 
 export class AddItemModal {
-    constructor(onItemSaved) {
-        this.onItemSaved = onItemSaved;
-        this.overlay = null;
-        this.uploadedBase64 = null;
-        this.defaultStatus = 'wish'; // 'wish' or 'bought'
+    constructor(onSaveCallback) {
+        this.onSave = onSaveCallback;
         this.render();
+        this.modal = document.getElementById('add-item-modal');
+        this.form = document.getElementById('add-item-form');
+        this.bindEvents();
+        this.editingId = null;
     }
 
     render() {
-        this.overlay = document.createElement('div');
-        this.overlay.className = 'modal-overlay';
+        if (document.getElementById('add-item-modal')) return;
 
-        const categoryGridHtml = Object.keys(CATEGORIES).map(key => {
-            const cat = CATEGORIES[key];
-            return `<div class="cat-pill" data-cat="${key}"><span class="cat-icon">${cat.icon}</span><span class="cat-name">${cat.label}</span></div>`;
-        }).join('');
+        const cats = Object.keys(CATEGORIES).map(c => `<option value="${c}">${c}</option>`).join('');
+        const occasions = ['Birthday', 'Anniversary', 'New Year', 'Self-care', 'Vacation', 'Work', 'Party', 'Other']
+            .map(o => `<option value="${o}">${o}</option>`).join('');
 
-        this.overlay.innerHTML = `
-            <div class="glass-panel modal-content">
-                <div class="modal-header"><h2 id="modal-title">${i18n.t('modal.title')}</h2><button class="close-btn">&times;</button></div>
-                
-                <form id="add-item-form">
-                    <!-- Title & Magic -->
-                    <div class="form-group">
-                        <label>${i18n.t('modal.what')}</label>
-                        <div style="display: flex; gap: 8px;">
-                            <input type="text" name="title" id="input-title" placeholder="e.g. Vintage Lamp" required autocomplete="off" style="flex: 1;">
-                            <button type="button" id="btn-magic-add" class="btn-magic" title="Auto-fill">
-                                <span style="font-size: 1.1em;">✨</span>
-                            </button>
-                        </div>
+        const html = `
+            <div id="add-item-modal" class="modal-overlay" style="z-index:1100;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3 id="modal-title">${i18n.t('nav.add_wish')}</h3>
+                        <button class="close-btn">&times;</button>
                     </div>
+                    
+                    <form id="add-item-form">
+                        <div class="form-group" id="link-group">
+                            <label>${i18n.t('ai.pasteLink')}</label>
+                            <div style="display:flex; gap:8px;">
+                                <input type="url" id="item-link" name="link" placeholder="https://trendyol.com/..." style="flex:1;">
+                                <button type="button" id="btn-magic-fill" class="btn-magic">✨ Auto</button>
+                            </div>
+                            <small style="color:var(--text-tertiary); font-size:0.75rem;">Paste a link and click Auto to fill details.</small>
+                        </div>
 
-                    <div id="magic-url-container" style="display:none; margin-bottom: 16px; animation: fadeSlideUp 0.3s var(--ease-spring);">
-                        <div class="form-group">
-                            <label>Product URL</label>
-                            <div style="display: flex; flex-direction: column; gap: 8px;">
-                                <div style="display:flex; gap:8px;">
-                                    <input type="url" id="magic-url-input" placeholder="https://..." style="flex: 1;">
-                                    <button type="button" id="btn-fetch-magic" class="btn-primary" style="min-width: 80px;">${i18n.t('modal.fetch')}</button>
-                                </div>
-                                <p id="magic-error" style="color:#ff3b30; font-size:0.85rem; display:none; margin-top:4px;"></p>
+                        <div class="form-row">
+                            <div class="form-group" style="flex:2;">
+                                <label>Title</label>
+                                <input type="text" name="title" required placeholder="Vintage Jacket">
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label>Price</label>
+                                <input type="number" name="price" placeholder="0.00">
+                            </div>
+                            <div class="form-group" style="width:80px;">
+                                <label>Curr</label>
+                                <select name="currency">
+                                    <option value="TRY">TRY</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="GBP">GBP</option>
+                                </select>
                             </div>
                         </div>
-                    </div>
 
-                    <div id="ai-insight-box" style="display:none; background:rgba(100, 200, 255, 0.1); border:1px solid rgba(100, 200, 255, 0.3); padding:12px; border-radius:12px; margin-bottom:20px;">
-                        <strong style="display:block; font-size:0.8rem; color:#007AFF; margin-bottom:4px;">🤖 AI Insight</strong>
-                        <p id="ai-reason-text" style="font-size:0.9rem; color:var(--text-primary); margin:0; line-height:1.4;"></p>
-                    </div>
-
-                    <!-- Description -->
-                    <div class="form-group">
-                        <label>Description</label>
-                        <textarea id="input-description" rows="2" placeholder="Details, size, color..." style="width:100%; padding:12px; border-radius:16px; border:1px solid rgba(0,0,0,0.08); background:rgba(255,255,255,0.6); font-family:var(--font-body);"></textarea>
-                    </div>
-
-                    <!-- Price -->
-                    <div class="form-row">
-                        <div class="form-group" style="flex:2;"><label>${i18n.t('modal.price')}</label><input type="number" name="price" id="input-price" placeholder="0" step="0.01"></div>
-                        <div class="form-group" style="flex:1;"><label>Currency</label><select name="currency" id="input-currency"><option value="TRY">TRY</option><option value="EUR">EUR</option><option value="USD">USD</option></select></div>
-                    </div>
-                    
-                    <!-- Occasion & Lists -->
-                    <div class="form-row">
-                        <div class="form-group" style="flex:1;">
-                            <label>${i18n.t('modal.occasion')}</label>
-                            <select name="occasion" id="input-occasion">
-                                <option value="">None</option>
-                                <option value="Birthday">🎂 Birthday</option>
-                                <option value="New Year">🎆 New Year</option>
-                                <option value="Anniversary">💍 Anniversary</option>
-                                <option value="Custom">✏️ Custom...</option>
-                            </select>
-                            <input type="text" id="input-custom-occasion" placeholder="${i18n.t('modal.occasion_custom')}" style="display:none; margin-top:8px;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select name="category">${cats}</select>
+                            </div>
+                            <div class="form-group">
+                                <label>Priority</label>
+                                <select name="priority">
+                                    <option value="Low">Low</option>
+                                    <option value="Medium" selected>Medium</option>
+                                    <option value="High">High</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="form-group" style="flex:1;">
-                            <label>Lists / Tags</label>
-                            <input type="text" id="input-lists" placeholder="Summer, Tech...">
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Occasion (Optional)</label>
+                                <select name="occasion">
+                                    <option value="">None</option>
+                                    ${occasions}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Target Date</label>
+                                <input type="date" name="targetDate">
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="form-group">
-                        <label>${i18n.t('modal.privacy')}</label>
-                        <select name="visibility" id="input-visibility">
-                            <option value="default">Default</option>
-                            <option value="public">Public</option>
-                            <option value="friends">Friends Only</option>
-                            <option value="private">Private</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group"><label>${i18n.t('modal.category')}</label><div class="category-grid" id="category-grid">${categoryGridHtml}</div><input type="hidden" name="category" id="hidden-category" required>
-                    <input type="hidden" name="subcategory" id="hidden-subcategory"></div>
-                    
-                    <div class="form-group" id="custom-cat-container" style="display:none;">
-                        <label>${i18n.t('modal.customCategory')}</label>
-                        <input type="text" id="input-custom-cat" placeholder="My Category Name">
-                    </div>
-
-                    <div class="form-group">
-                        <label>${i18n.t('modal.priority')}</label>
-                        <div class="priority-segmented-control">
-                            <label><input type="radio" name="priority" value="Low" id="prio-low"><span>Low</span></label>
-                            <label><input type="radio" name="priority" value="Medium" id="prio-med" checked><span>Med</span></label>
-                            <label><input type="radio" name="priority" value="High" id="prio-high"><span>High</span></label>
+                        <div class="form-group">
+                            <label>Image URL</label>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <input type="text" name="imageUrl" id="input-image-url" placeholder="https://...">
+                                <img id="preview-img" src="" style="width:40px; height:40px; border-radius:4px; object-fit:cover; display:none; background:#eee;">
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="form-group"><label>Target Date</label><input type="date" name="targetDate" id="input-date" style="width: 100%;"></div>
-                    
-                    <div class="form-group">
-                        <label>${i18n.t('modal.image')}</label>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <input type="url" id="img-input" name="imageUrl" placeholder="https://..." style="flex:1;">
-                            <input type="file" id="img-upload" accept="image/*" style="display:none;">
-                            <button type="button" class="btn-text" id="btn-trigger-upload" style="background:rgba(0,0,0,0.05); padding:10px; border-radius:12px;">📷</button>
-                        </div>
-                        <small id="file-name-display" style="display:none; color:var(--accent-color); margin-top:4px;"></small>
-                        <div id="img-preview" style="width: 100%; height: 150px; margin-top: 10px; border-radius: 12px; background: #f0f0f0; background-size: cover; background-position: center; display: none; transition: background-image 0.3s;"></div>
-                    </div>
 
-                    <div class="form-group" style="display:flex; align-items:center; justify-content:space-between; background:rgba(0,0,0,0.03); padding:12px; border-radius:12px;">
-                        <label style="margin:0; cursor:pointer;" for="check-owned">I already own this</label>
-                        <label class="toggle-switch-label">
-                            <input type="checkbox" name="isOwned" id="check-owned">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    
-                    <div class="modal-actions">
-                        <button type="button" class="btn-text close-trigger">${i18n.t('modal.cancel')}</button>
-                        <button type="submit" class="btn-primary" id="btn-submit-wish">${i18n.t('modal.save')}</button>
-                    </div>
-                </form>
+                        <div class="form-group" style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+                            <input type="checkbox" id="check-is-owned" name="isOwned" style="width:auto; margin:0;">
+                            <label for="check-is-owned" style="margin:0; font-weight:500;">I already own this item (Add to Closet)</label>
+                        </div>
+
+                        <button type="submit" class="btn-primary" style="width:100%; margin-top:16px;">
+                            ${i18n.t('common.save')}
+                        </button>
+                    </form>
+                </div>
             </div>
         `;
-        document.body.appendChild(this.overlay);
-        this.bindEvents();
+        document.body.insertAdjacentHTML('beforeend', html);
     }
 
     bindEvents() {
-        const form = this.overlay.querySelector('#add-item-form');
-        const imgInput = this.overlay.querySelector('#img-input');
-        const imgUpload = this.overlay.querySelector('#img-upload');
-        const btnUpload = this.overlay.querySelector('#btn-trigger-upload');
-        const fileNameDisplay = this.overlay.querySelector('#file-name-display');
-        const imgPreview = this.overlay.querySelector('#img-preview');
-        const btnMagicAdd = this.overlay.querySelector('#btn-magic-add');
-        const magicContainer = this.overlay.querySelector('#magic-url-container');
-        const btnFetchMagic = this.overlay.querySelector('#btn-fetch-magic');
-        const magicInput = this.overlay.querySelector('#magic-url-input');
-        const categoryGrid = this.overlay.querySelector('#category-grid');
-        const occasionSelect = this.overlay.querySelector('#input-occasion');
+        const closeBtn = this.modal.querySelector('.close-btn');
+        closeBtn.onclick = () => this.close();
 
-        const selectCategory = (key) => {
-            const pills = this.overlay.querySelectorAll('.cat-pill');
-            pills.forEach(p => p.classList.remove('selected'));
-            const selected = this.overlay.querySelector(`.cat-pill[data-cat="${key}"]`);
-            if (selected) selected.classList.add('selected');
-            this.overlay.querySelector('#hidden-category').value = key;
-            this.overlay.querySelector('#custom-cat-container').style.display = key === 'Custom' ? 'block' : 'none';
-        };
+        this.modal.querySelector('#btn-magic-fill').onclick = async (e) => {
+            const btn = e.target;
+            const link = document.getElementById('item-link').value;
+            if (!link) return;
 
-        categoryGrid.addEventListener('click', (e) => {
-            const pill = e.target.closest('.cat-pill');
-            if (pill) selectCategory(pill.dataset.cat);
-        });
-
-        occasionSelect.addEventListener('change', (e) => {
-            const customInput = document.getElementById('input-custom-occasion');
-            customInput.style.display = e.target.value === 'Custom' ? 'block' : 'none';
-        });
-
-        btnMagicAdd.onclick = () => {
-            const isHidden = magicContainer.style.display === 'none';
-            magicContainer.style.display = isHidden ? 'block' : 'none';
-            if (isHidden) magicInput.focus();
-        };
-
-        btnUpload.onclick = () => imgUpload.click();
-
-        imgUpload.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                if (file.size > 1024 * 1024) {
-                    alert("Image too large. Please use a URL or an image under 1MB.");
-                    imgUpload.value = '';
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    this.uploadedBase64 = ev.target.result;
-                    imgPreview.style.backgroundImage = `url('${this.uploadedBase64}')`;
-                    imgPreview.style.display = 'block';
-                    imgInput.value = '';
-                    imgInput.disabled = true;
-                    imgInput.placeholder = "(Image File Selected)";
-                    fileNameDisplay.textContent = `Selected: ${file.name}`;
-                    fileNameDisplay.style.display = 'block';
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-
-        imgInput.addEventListener('input', () => {
-            if (imgInput.value) {
-                this.uploadedBase64 = null;
-                imgUpload.value = '';
-                fileNameDisplay.style.display = 'none';
-                imgPreview.style.display = 'block';
-                imgPreview.style.backgroundImage = `url('${imgInput.value}')`;
-            } else if (!this.uploadedBase64) {
-                imgPreview.style.display = 'none';
-            }
-        });
-
-        btnFetchMagic.addEventListener('click', async () => {
-            if (!authService.canUseFeature(FEATURES.MAGIC_ADD)) { premiumModal.open(); return; }
-
-            const url = magicInput.value.trim();
-            if (!url) return;
-
-            document.getElementById('magic-error').style.display = 'none';
-            document.getElementById('ai-insight-box').style.display = 'none';
-            btnFetchMagic.innerHTML = `...`;
-            btnFetchMagic.disabled = true;
-
-            if (window.aiCompanion) window.aiCompanion.setState('thinking');
-
+            btn.disabled = true;
+            btn.innerHTML = 'Thinking...';
+            
             try {
-                const { apiCall } = await import('../config/api.js');
-                const metaData = await apiCall('/api/product/metadata', 'POST', { url });
-
-                if (metaData.title) this.overlay.querySelector('#input-title').value = metaData.title;
-                if (metaData.price !== null) this.overlay.querySelector('#input-price').value = metaData.price;
-                if (metaData.currency) this.overlay.querySelector('#input-currency').value = metaData.currency;
-                if (metaData.description) this.overlay.querySelector('#input-description').value = metaData.description;
-
-                if (metaData.imageUrl) {
-                    imgInput.value = metaData.imageUrl;
-                    imgInput.dispatchEvent(new Event('input'));
+                const data = await apiCall('/api/product/metadata', 'POST', { url: link });
+                const f = this.form;
+                if (data.title) f.title.value = data.title;
+                if (data.price) f.price.value = data.price;
+                if (data.currency) f.currency.value = data.currency;
+                if (data.imageUrl) {
+                    f.imageUrl.value = data.imageUrl;
+                    this.updatePreview(data.imageUrl);
                 }
-
-                if (metaData.category) selectCategory(metaData.category);
-                if (metaData.subcategory) this.overlay.querySelector('#hidden-subcategory').value = metaData.subcategory;
-
-                if (metaData.priorityLevel) {
-                    const pVal = metaData.priorityLevel.charAt(0).toUpperCase() + metaData.priorityLevel.slice(1).toLowerCase();
-                    const radio = this.overlay.querySelector(`input[name="priority"][value="${pVal}"]`);
-                    if (radio) radio.checked = true;
-                }
-
-                if (metaData.reason) {
-                    document.getElementById('ai-insight-box').style.display = 'block';
-                    document.getElementById('ai-reason-text').textContent = metaData.reason;
-                }
-
-                if (metaData.title) {
-                    magicContainer.style.display = 'none';
-                    if (window.aiCompanion) window.aiCompanion.say("Found it!", "magic", 2000);
-                }
-
-            } catch (error) {
-                console.warn(error);
-                document.getElementById('magic-error').textContent = "Could not read link.";
-                document.getElementById('magic-error').style.display = 'block';
+                if (data.category) f.category.value = data.category;
+                if (data.priorityLevel) f.priority.value = data.priorityLevel;
+                
+                window.showToast('Magic fill applied! ✨');
+            } catch (err) {
+                console.error(err);
+                window.showToast('Could not fetch details.', 'error');
             } finally {
-                btnFetchMagic.textContent = i18n.t('modal.fetch');
-                btnFetchMagic.disabled = false;
+                btn.disabled = false;
+                btn.innerHTML = '✨ Auto';
             }
-        });
+        };
 
-        this.overlay.querySelectorAll('.close-btn, .close-trigger').forEach(btn =>
-            btn.addEventListener('click', () => this.close())
-        );
+        document.getElementById('input-image-url').onchange = (e) => this.updatePreview(e.target.value);
 
-        form.addEventListener('submit', async (e) => {
+        this.form.onsubmit = async (e) => {
             e.preventDefault();
-            const btn = form.querySelector('button[type="submit"]');
-            btn.textContent = i18n.t('common.saving'); btn.disabled = true;
+            const user = authService.currentUser;
+            if (!user) return;
 
-            const formData = new FormData(form);
-            let category = formData.get('category');
-            if (category === 'Custom') {
-                category = document.getElementById('input-custom-cat').value.trim() || 'Other';
-            }
-
-            let occasion = formData.get('occasion');
-            if (occasion === 'Custom') {
-                occasion = document.getElementById('input-custom-occasion').value.trim();
-            }
-
-            let finalImage = formData.get('imageUrl');
-            if (this.uploadedBase64) {
-                finalImage = this.uploadedBase64;
-            }
-
-            const isOwned = formData.get('isOwned') === 'on';
-            const listStr = document.getElementById('input-lists').value;
-            const lists = listStr ? listStr.split(',').map(s => s.trim()).filter(s => s) : [];
-
+            const fd = new FormData(this.form);
+            const isOwned = document.getElementById('check-is-owned').checked;
+            
             const itemData = {
-                title: formData.get('title'),
-                description: document.getElementById('input-description').value,
-                price: parseFloat(formData.get('price')) || 0,
-                currency: formData.get('currency'),
-                category: category,
-                subcategory: formData.get('subcategory') || null,
-                priority: formData.get('priority'),
-                occasion: occasion || null,
-                lists: lists,
-                visibility: formData.get('visibility'),
-                imageUrl: finalImage,
-                targetDate: formData.get('targetDate') || null,
-                ownerId: authService.currentUser.uid,
-                link: magicInput.value || null,
+                ownerId: user.uid,
+                title: fd.get('title'),
+                price: parseFloat(fd.get('price')) || 0,
+                currency: fd.get('currency'),
+                category: fd.get('category'),
+                priority: fd.get('priority'),
+                occasion: fd.get('occasion') || null,
+                targetDate: fd.get('targetDate') || null,
+                imageUrl: fd.get('imageUrl'),
+                link: fd.get('link'),
+                // Logic: if checked, status is 'bought', else 'wish' (default)
                 status: isOwned ? 'bought' : 'wish'
             };
 
             try {
                 if (this.editingId) {
+                    // When editing, we might want to preserve status unless explicitly changed.
+                    // But here, let's allow the checkbox to override.
                     await firestoreService.updateItem(this.editingId, itemData);
+                    window.showToast('Item updated');
                 } else {
                     await firestoreService.addItem(itemData);
-                    aiService.triggerReaction(isOwned ? 'manifest' : 'add_wish', itemData);
+                    const msg = isOwned ? 'Added to Closet! 🧥' : 'Wish cast! ✨';
+                    window.showToast(msg);
                 }
                 this.close();
-                if (this.onItemSaved) this.onItemSaved();
-            } catch (e) {
-                console.error(e);
-                alert(i18n.t('common.error'));
-            } finally {
-                btn.textContent = i18n.t('modal.save'); btn.disabled = false;
+                if (this.onSave) this.onSave();
+            } catch (err) {
+                console.error(err);
+                alert("Error saving item.");
             }
-        });
+        };
+    }
+
+    updatePreview(url) {
+        const img = document.getElementById('preview-img');
+        if (url) {
+            img.src = url;
+            img.style.display = 'block';
+        } else {
+            img.style.display = 'none';
+        }
+    }
+
+    // Pass `initialStatus` to pre-check the "Owned" box
+    open(item = null, initialStatus = 'wish') {
+        this.editingId = item ? item.id : null;
+        this.form.reset();
+        this.updatePreview('');
+
+        const modalTitle = document.getElementById('modal-title');
+        const checkOwned = document.getElementById('check-is-owned');
+
+        if (item) {
+            modalTitle.textContent = "Edit Item";
+            const f = this.form;
+            f.title.value = item.title;
+            f.price.value = item.price;
+            f.currency.value = item.currency;
+            f.category.value = item.category;
+            f.priority.value = item.priority;
+            f.occasion.value = item.occasion || '';
+            f.targetDate.value = item.targetDate || '';
+            f.imageUrl.value = item.imageUrl || '';
+            f.link.value = item.link || '';
+            this.updatePreview(item.imageUrl);
+            
+            // Set checkbox based on existing item status
+            checkOwned.checked = (item.status === 'bought' || item.isOwned);
+        } else {
+            modalTitle.textContent = initialStatus === 'bought' ? "Add to Closet" : i18n.t('nav.add_wish');
+            checkOwned.checked = (initialStatus === 'bought');
+        }
+
+        this.modal.style.display = 'flex';
+        requestAnimationFrame(() => this.modal.classList.add('active'));
     }
 
     close() {
-        this.overlay.classList.remove('active');
-        setTimeout(() => this.overlay.style.display = 'none', 300);
-    }
-
-    open(itemToEdit = null, options = {}) {
-        this.overlay.style.display = 'flex';
-        requestAnimationFrame(() => this.overlay.classList.add('active'));
-
-        const form = this.overlay.querySelector('#add-item-form');
-        form.reset();
-        this.editingId = null;
-        this.uploadedBase64 = null;
-
-        const imgInput = this.overlay.querySelector('#img-input');
-        imgInput.disabled = false;
-        imgInput.placeholder = "https://...";
-
-        this.overlay.querySelector('#input-description').value = '';
-        this.overlay.querySelector('#input-lists').value = '';
-        this.overlay.querySelector('#magic-url-input').value = '';
-
-        this.overlay.querySelector('#file-name-display').style.display = 'none';
-        this.overlay.querySelector('#img-preview').style.display = 'none';
-        this.overlay.querySelector('#custom-cat-container').style.display = 'none';
-        document.getElementById('input-custom-occasion').style.display = 'none';
-        document.getElementById('magic-url-container').style.display = 'none';
-        document.getElementById('ai-insight-box').style.display = 'none';
-
-        const pills = this.overlay.querySelectorAll('.cat-pill');
-        pills.forEach(p => p.classList.remove('selected'));
-
-        // Handle default status logic (e.g. adding from Closet)
-        const ownedCheck = this.overlay.querySelector('#check-owned');
-        if (options.defaultStatus === 'bought') {
-            ownedCheck.checked = true;
-        } else {
-            ownedCheck.checked = false;
-        }
-
-        if (itemToEdit) {
-            this.editingId = itemToEdit.id;
-            this.overlay.querySelector('#modal-title').textContent = i18n.t('modal.editTitle');
-            this.overlay.querySelector('#input-title').value = itemToEdit.title;
-            this.overlay.querySelector('#input-description').value = itemToEdit.description || '';
-            this.overlay.querySelector('#input-price').value = itemToEdit.price;
-            this.overlay.querySelector('#input-currency').value = itemToEdit.currency;
-            this.overlay.querySelector('#input-lists').value = (itemToEdit.lists || []).join(', ');
-
-            if (itemToEdit.link || itemToEdit.originalUrl) {
-                this.overlay.querySelector('#magic-url-input').value = itemToEdit.link || itemToEdit.originalUrl;
-            }
-
-            if (itemToEdit.occasion) {
-                const occSelect = this.overlay.querySelector('#input-occasion');
-                if ([...occSelect.options].some(o => o.value === itemToEdit.occasion)) {
-                    occSelect.value = itemToEdit.occasion;
-                } else {
-                    occSelect.value = 'Custom';
-                    document.getElementById('input-custom-occasion').style.display = 'block';
-                    document.getElementById('input-custom-occasion').value = itemToEdit.occasion;
-                }
-            }
-
-            if (itemToEdit.targetDate) this.overlay.querySelector('#input-date').value = itemToEdit.targetDate;
-            if (itemToEdit.visibility) this.overlay.querySelector('#input-visibility').value = itemToEdit.visibility;
-
-            if (itemToEdit.imageUrl) {
-                imgInput.value = itemToEdit.imageUrl;
-                this.overlay.querySelector('#img-preview').style.display = 'block';
-                this.overlay.querySelector('#img-preview').style.backgroundImage = `url('${itemToEdit.imageUrl}')`;
-            }
-
-            if (itemToEdit.category) {
-                const catEl = this.overlay.querySelector(`.cat-pill[data-cat="${itemToEdit.category}"]`);
-                if (catEl) catEl.click();
-            }
-
-            const radio = this.overlay.querySelector(`input[name="priority"][value="${itemToEdit.priority}"]`);
-            if (radio) radio.checked = true;
-
-            if (ownedCheck) ownedCheck.checked = itemToEdit.status === 'bought' || itemToEdit.isOwned;
-        }
+        this.modal.classList.remove('active');
+        setTimeout(() => this.modal.style.display = 'none', 300);
     }
 }

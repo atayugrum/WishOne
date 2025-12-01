@@ -995,6 +995,104 @@ select:focus {
     background: rgba(0, 0, 0, 0.1);
 }
 
+/* Board Preview Grid (2x2) */
+.board-preview-grid {
+    height: 140px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    background: rgba(0,0,0,0.05);
+    overflow: hidden;
+}
+
+.board-preview-grid > div {
+    background-size: cover;
+    background-position: center;
+    background-color: #eee;
+    transition: transform 0.3s;
+}
+
+.board-preview-grid.count-1 > div {
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+}
+
+.board-preview-grid.count-2 > div:nth-child(1) {
+    grid-column: 1 / 2;
+    grid-row: 1 / -1;
+}
+.board-preview-grid.count-2 > div:nth-child(2) {
+    grid-column: 2 / 3;
+    grid-row: 1 / -1;
+}
+
+.board-preview-grid.count-3 > div:nth-child(1) {
+    grid-column: 1 / 2;
+    grid-row: 1 / -1;
+}
+
+.board-card:hover .board-preview-grid > div {
+    transform: scale(1.05);
+}
+
+.board-cover-placeholder {
+    height: 140px;
+    background: rgba(0,0,0,0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.board-cover-placeholder::after {
+    content: '📌';
+    font-size: 2rem;
+    opacity: 0.3;
+}
+
+/* Pin Candidate in Add Modal */
+.pin-candidate {
+    background-size: cover;
+    background-position: center;
+    border-radius: 8px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.2s;
+}
+.pin-candidate:hover {
+    transform: scale(1.05);
+    border-color: var(--accent-color);
+}
+
+/* Pin Actions Overlay */
+.pin-actions {
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 6px;
+}
+.pin-item:hover .pin-actions {
+    opacity: 1;
+}
+.pin-actions .icon-btn {
+    background: rgba(255,255,255,0.9);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+}
+.pin-actions .icon-btn:hover {
+    transform: scale(1.1);
+}
+
 /* --- Card Badges & States --- */
 .card-owned {
     opacity: 0.8;
@@ -1377,6 +1475,16 @@ select:focus {
     font-weight: 700;
 }
 
+/* Add Pin Tile in Grid */
+.add-pin-tile {
+    transition: all 0.3s var(--ease-ios);
+}
+.add-pin-tile:hover {
+    background: rgba(255,255,255,0.7) !important;
+    border-color: var(--accent-color) !important;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+}
 /* --- Ads --- */
 .ad-wrapper {
     width: 100%;
@@ -1559,6 +1667,201 @@ select:focus {
     gap: 8px;
 }
 
+
+/* --- COMBO EDITOR --- */
+.combo-workspace {
+    display: flex;
+    gap: 16px;
+    height: 100%;
+    min-height: 0; /* Flexbox overflow fix */
+    margin-top: 16px;
+    position: relative;
+}
+
+/* Sidebar */
+.combo-sidebar {
+    width: 240px;
+    display: flex;
+    flex-direction: column;
+    padding: 16px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.sidebar-search {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.1);
+    background: rgba(255,255,255,0.5);
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+}
+
+.sidebar-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    align-content: start;
+    padding-right: 4px; /* Space for scrollbar */
+}
+
+.combo-item-thumb {
+    position: relative;
+    aspect-ratio: 1;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: grab;
+    border: 1px solid rgba(0,0,0,0.05);
+    transition: transform 0.2s;
+}
+.combo-item-thumb:active {
+    cursor: grabbing;
+}
+.combo-item-thumb:hover {
+    transform: scale(1.02);
+    border-color: var(--accent-color);
+}
+.combo-item-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.combo-item-thumb .plus-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.5rem;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.combo-item-thumb:hover .plus-overlay {
+    opacity: 1;
+}
+
+/* Canvas Container */
+.combo-canvas-container {
+    flex: 1;
+    position: relative;
+    background: #f5f5f7;
+    border-radius: 16px;
+    border: 2px dashed rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.combo-canvas {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    /* Dot pattern background */
+    background-image: radial-gradient(rgba(0,0,0,0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.canvas-placeholder {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: var(--text-tertiary);
+    font-size: 1.2rem;
+    pointer-events: none;
+}
+
+.canvas-controls {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    z-index: 1000;
+}
+
+/* Canvas Item */
+.canvas-item {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    padding: 6px;
+    cursor: grab;
+    transition: box-shadow 0.2s, transform 0.2s;
+    user-select: none;
+    border-radius: 12px; /* Ensure glass panel look */
+}
+.canvas-item.selected {
+    box-shadow: 0 0 0 2px var(--accent-color), 0 8px 20px rgba(0,0,0,0.1);
+    z-index: 1000 !important; /* Bring to very front */
+}
+.canvas-item:active {
+    cursor: grabbing;
+}
+.canvas-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+/* Item Overlay Controls (Delete/Up) */
+.canvas-controls-overlay {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+}
+.canvas-item:hover .canvas-controls-overlay,
+.canvas-item.selected .canvas-controls-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.ctrl-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.ctrl-btn.delete { color: #ff3b30; }
+.ctrl-btn:hover { transform: scale(1.1); }
+
+/* Animation */
+.anim-drop {
+    animation: dropIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes dropIn {
+    from { transform: scale(0); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .combo-workspace {
+        flex-direction: column-reverse;
+    }
+    .combo-sidebar {
+        width: 100%;
+        height: 200px;
+    }
+    .sidebar-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
 /* Responsive */
 @media (max-width: 900px) {
     .combo-workspace {
@@ -1918,6 +2221,17 @@ body.mode-love .toast-notification {
     break-inside: avoid;
     /* Prevents cutting in half */
     vertical-align: top;
+}
+
+/* High Priority Glow */
+.card-priority-high {
+    border: 1.5px solid rgba(255, 59, 48, 0.5) !important;
+    box-shadow: 0 8px 25px rgba(255, 59, 48, 0.2) !important;
+}
+
+.card-priority-high:hover {
+    box-shadow: 0 12px 35px rgba(255, 59, 48, 0.35) !important;
+    border-color: rgba(255, 59, 48, 0.8) !important;
 }
 
 .card-closet {
@@ -2582,4 +2896,66 @@ body.mode-love .toast-notification {
 
 .onboarding-step {
     animation: fadeUp 0.4s ease-out;
+}
+
+.scroll-row {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;  /* IE */
+}
+.scroll-row::-webkit-scrollbar { 
+    display: none; 
+}
+
+/* Analytics & Planner Modal Styles */
+.form-input {
+    padding: 10px;
+    border: 1px solid rgba(0,0,0,0.1);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.8);
+    font-size: 1rem;
+}
+
+/* Transitions */
+.view-transition-fade {
+    animation: fadeUp 0.3s ease-out forwards;
+}
+.grid-transition-fade {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* --- Onboarding Styles --- */
+.step-dot { 
+    width: 10px; 
+    height: 10px; 
+    border-radius: 50%; 
+    background: var(--background-secondary); 
+    transition: all 0.3s; 
+    border: 1px solid rgba(0,0,0,0.1);
+}
+.step-dot.active { 
+    background: var(--accent-color); 
+    transform: scale(1.3); 
+    border-color: var(--accent-color);
+}
+
+/* --- Home View Styles --- */
+.home-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding: 15px 0;
+}
+
+.financial-card {
+    /* Use the glass-panel styles but make it stand out */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    border-left: 5px solid var(--accent-color);
+}
+
+.home-view .subtitle {
+    font-size: 0.9rem;
+    color: var(--text-tertiary);
 }

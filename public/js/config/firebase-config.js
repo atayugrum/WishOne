@@ -1,9 +1,10 @@
-// js/config/firebase-config.js
+/* public/js/config/firebase-config.js */
 
 // --- USE THESE EXACT URLS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"; // NEW
+import { getAuth, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js"; // [NEW] Import Storage
 
 const firebaseConfig = {
   apiKey: "AIzaSyC2VwvJV6en5l2Oq1n0WHv2mPaSbPpL-wA",
@@ -17,7 +18,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // Initialize Auth
-const googleProvider = new GoogleAuthProvider(); // Setup Google
+const auth = getAuth(app);
+const googleProvider = new GoogleAuthProvider();
+const storage = getStorage(app); // [NEW] Initialize Storage
 
-export { db, auth, googleProvider };
+export { db, auth, googleProvider, storage };

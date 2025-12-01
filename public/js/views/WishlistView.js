@@ -1,28 +1,26 @@
+/* public/js/views/WishlistView.js */
 import { firestoreService } from '../services/FirestoreService.js';
 import { authService } from '../services/AuthService.js';
 import { AddItemModal } from '../components/addItemModal.js';
 import { CATEGORIES } from '../config/categories.js';
 import { i18n } from '../services/LocalizationService.js';
-import { premiumModal } from '../components/PremiumModal.js';
 import { GamificationService } from '../services/GamificationService.js';
 import { aiService } from '../services/AIService.js';
 
 let addItemModal = null;
 let itemsMap = new Map();
-
-// Filter State
 let currentFilters = {
     saleOnly: false,
     category: 'All',
     occasion: 'All',
+    priceRange: 'All', // New
     status: 'wish',
-    priceMin: null,
-    priceMax: null,
     search: '',
-    viewMode: 'grid', // 'grid' | 'timeline' | 'gift'
+    viewMode: 'grid',
     sortOrder: 'newest'
 };
 
+// --- HELPERS ---
 function getCountdown(dateString) {
     if (!dateString) return null;
     const target = new Date(dateString);
@@ -32,17 +30,26 @@ function getCountdown(dateString) {
     target.setHours(0, 0, 0, 0);
     const diffTime = target - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays < 0) return { text: i18n.t('time.overdue') || "Overdue", class: "tag-overdue" };
-    if (diffDays === 0) return { text: i18n.t('time.today') || "Today!", class: "tag-urgent" };
-    if (diffDays <= 7) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-urgent" };
-    if (diffDays <= 30) return { text: `${diffDays} ${i18n.t('time.days_left') || "days left"}`, class: "tag-soon" };
-
+    if (diffDays < 0) return { text: i18n.t('time.overdue'), class: "tag-overdue" };
+    if (diffDays === 0) return { text: i18n.t('time.today'), class: "tag-urgent" };
+    if (diffDays <= 7) return { text: `${diffDays} ${i18n.t('time.days_left')}`, class: "tag-urgent" };
+    if (diffDays <= 30) return { text: `${diffDays} ${i18n.t('time.days_left')}`, class: "tag-soon" };
     const months = Math.round(diffDays / 30);
-    if (months <= 1) return { text: i18n.t('time.next_month') || "Next Month", class: "tag-far" };
-    if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} ${i18n.t('time.years') || "years"}`, class: "tag-far" };
+    if (months <= 1) return { text: i18n.t('time.next_month'), class: "tag-far" };
+    if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} ${i18n.t('time.years')}`, class: "tag-far" };
+    return { text: `in ${months} ${i18n.t('time.months')}`, class: "tag-far" };
+}
 
-    return { text: `in ${months} ${i18n.t('time.months') || "months"}`, class: "tag-far" };
+function getSavingInsight(price, targetDate) {
+    if (!price || price <= 0 || !targetDate) return null;
+    const target = new Date(targetDate);
+    const today = new Date();
+    if (target <= today) return null;
+    const diffTime = target - today;
+    const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
+    const weeks = Math.max(1, diffWeeks);
+    const weeklySaving = Math.ceil(price / weeks);
+    return { weeks, weeklySaving };
 }
 
 export const WishlistView = {
@@ -67,35 +74,44 @@ export const WishlistView = {
                         <h1>${i18n.t('nav.wishlist')}</h1>
                     </div>
                     
-                    <div class="view-toggle btn-group">
-                        <div style="display:flex; background:rgba(0,0,0,0.05); border-radius:20px; padding:2px;">
-                            <button id="btn-view-grid" class="toggle-btn active" style="padding:6px 12px;" title="Grid View">⊞</button>
-                            <button id="btn-view-timeline" class="toggle-btn" style="padding:6px 12px;" title="Timeline View">📅</button>
-                            <button id="btn-view-gift" class="toggle-btn" style="padding:6px 12px;" title="Gift Mode">🎁</button>
+                    <div style="display:flex; gap:8px;">
+                        <button id="btn-analytics" class="btn-text glass-panel" style="padding:6px 12px; font-size:0.85rem;">📊 Insights</button>
+                        <button id="btn-budget-planner" class="btn-magic" style="padding:6px 12px; font-size:0.85rem;">💸 Plan</button>
+
+                        <div class="view-toggle btn-group">
+                            <div style="display:flex; background:rgba(0,0,0,0.05); border-radius:20px; padding:2px;">
+                                <button id="btn-view-grid" class="toggle-btn active" style="padding:6px 12px;" title="Grid View">⊞</button>
+                                <button id="btn-view-timeline" class="toggle-btn" style="padding:6px 12px;" title="Timeline View">📅</button>
+                                <button id="btn-view-gift" class="toggle-btn" style="padding:6px 12px;" title="Gift Mode">🎁</button>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Filter Bar -->
                 <div class="filter-bar" style="display:flex; gap:8px; overflow-x:auto; padding:4px 0; align-items:center; scrollbar-width:none;">
                     <div class="glass-panel" style="display:flex; align-items:center; padding:0 12px; height:36px; border-radius:20px; min-width:140px;">
                         <span style="font-size:0.9rem; opacity:0.5; margin-right:6px;">🔍</span>
-                        <input type="text" id="search-input" placeholder="${i18n.t('ai.inputPlaceholder') || 'Search...'}" 
+                        <input type="text" id="search-input" placeholder="${i18n.t('ai.inputPlaceholder')}" 
                             style="border:none; background:transparent; font-size:0.85rem; width:100%; outline:none; padding:0; color:var(--text-primary);">
                     </div>
-
                     <select id="sort-order" class="filter-chip" style="min-width: auto; padding-right:24px;">
                         <option value="newest">🕒 Newest</option>
                         <option value="oldest">🕒 Oldest</option>
                         <option value="priority">🔥 Priority</option>
+                        <option value="price_high">💰 Price High</option>
+                        <option value="price_low">💰 Price Low</option>
                         <option value="date_near">📅 Due Soon</option>
                     </select>
-
                     <select id="filter-category" class="filter-chip" style="min-width: auto; padding-right:24px;">${catOptions}</select>
                     <select id="filter-occasion" class="filter-chip" style="min-width: auto; padding-right:24px;">
                         <option value="All">🎉 Occasion</option>${occOptions}
                     </select>
-
+                    <select id="filter-price" class="filter-chip" style="min-width: auto; padding-right:24px;">
+                        <option value="All">💵 Price</option>
+                        <option value="0-500">0 - 500</option>
+                        <option value="500-2000">500 - 2000</option>
+                        <option value="2000+">2000+</option>
+                    </select>
                     <button id="btn-archive-toggle" class="filter-chip">📦 Archived</button>
                     <button id="btn-sale-filter" class="filter-chip">% Sale</button>
                 </div>
@@ -109,11 +125,41 @@ export const WishlistView = {
                 <span style="font-size:24px;">+</span>
             </button>
 
-            <!-- Board Select Modal -->
             <div id="select-board-modal" class="modal-overlay" style="z-index: 1200;">
                 <div class="modal-content" style="max-width:350px;">
                     <div class="modal-header"><h3>📌 Add to Board</h3><button class="close-btn close-select-board">&times;</button></div>
                     <div id="board-list-simple" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <div id="planner-modal" class="modal-overlay" style="z-index: 1200;">
+                <div class="modal-content">
+                    <div class="modal-header"><h3>💸 Smart Purchase Plan</h3><button class="close-btn" id="close-planner">&times;</button></div>
+                    <div style="margin-bottom:16px;">
+                        <label>What is your budget for this month?</label>
+                        <div style="display:flex; gap:8px; margin-top:8px;">
+                            <input type="number" id="planner-budget" placeholder="e.g. 5000" class="form-input" style="flex:1;">
+                            <select id="planner-currency" class="form-input" style="width:80px;">
+                                <option value="TRY">TRY</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="btn-run-planner" style="width:100%;">🔮 Generate Plan</button>
+                    
+                    <div id="planner-results" style="margin-top:20px; display:none;">
+                        <div style="background:rgba(0,0,0,0.03); padding:12px; border-radius:8px; font-size:0.9rem; margin-bottom:12px;" id="planner-summary"></div>
+                        <div id="planner-items-list" style="display:flex; flex-direction:column; gap:8px; max-height:250px; overflow-y:auto;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="analytics-modal" class="modal-overlay" style="z-index: 1200;">
+                <div class="modal-content">
+                    <div class="modal-header"><h3>📊 Wishlist Insights</h3><button class="close-btn" id="close-analytics">&times;</button></div>
+                    <div id="analytics-body" style="display:flex; flex-direction:column; gap:16px;">
+                        </div>
                 </div>
             </div>
         `;
@@ -121,26 +167,33 @@ export const WishlistView = {
 
     afterRender: async () => {
         if (!addItemModal) addItemModal = new AddItemModal(() => WishlistView.loadData());
-
-        // Bind Events
+        
         const fab = document.getElementById('fab-add-wish');
         if (fab) fab.onclick = () => addItemModal.open();
 
         const renderWithTransition = () => {
             const grid = document.querySelector('.masonry-grid');
-            if (grid) {
-                grid.classList.add('grid-transition-fade');
+            const giftMode = document.querySelector('.gift-mode-container');
+            
+            // Handle different container types
+            const target = grid || giftMode || document.getElementById('content-area');
+            
+            if (target) {
+                target.style.opacity = '0';
+                target.style.transform = 'translateY(10px)';
                 setTimeout(() => {
                     WishlistView.renderContent();
-                    const newGrid = document.querySelector('.masonry-grid');
-                    if (newGrid) newGrid.classList.remove('grid-transition-fade');
+                    const newTarget = document.querySelector('.masonry-grid') || document.querySelector('.gift-mode-container');
+                    if (newTarget) {
+                        newTarget.style.opacity = '1';
+                        newTarget.style.transform = 'translateY(0)';
+                    }
                 }, 200);
             } else {
                 WishlistView.renderContent();
             }
         };
 
-        // Filter Bindings
         const bindFilter = (id, key, type = 'value') => {
             const el = document.getElementById(id);
             if (!el) return;
@@ -157,6 +210,7 @@ export const WishlistView = {
 
         bindFilter('search-input', 'search');
         bindFilter('filter-category', 'category');
+        bindFilter('filter-price', 'priceRange');
         bindFilter('sort-order', 'sortOrder');
         bindFilter('btn-sale-filter', 'saleOnly', 'click');
 
@@ -179,7 +233,6 @@ export const WishlistView = {
             };
         }
 
-        // View Toggles
         const setView = (mode) => {
             currentFilters.viewMode = mode;
             ['grid', 'timeline', 'gift'].forEach(m => {
@@ -191,6 +244,57 @@ export const WishlistView = {
         document.getElementById('btn-view-grid').onclick = () => setView('grid');
         document.getElementById('btn-view-timeline').onclick = () => setView('timeline');
         document.getElementById('btn-view-gift').onclick = () => setView('gift');
+
+        // Modal Logic
+        const setupModal = (triggerId, modalId, closeId) => {
+            const btn = document.getElementById(triggerId);
+            const modal = document.getElementById(modalId);
+            const close = document.getElementById(closeId);
+            if (btn) btn.onclick = () => { modal.style.display = 'flex'; requestAnimationFrame(() => modal.classList.add('active')); };
+            if (close) close.onclick = () => { modal.classList.remove('active'); setTimeout(() => modal.style.display = 'none', 300); };
+        };
+
+        setupModal('btn-budget-planner', 'planner-modal', 'close-planner');
+        setupModal('btn-analytics', 'analytics-modal', 'close-analytics');
+
+        // Analytics Render Logic
+        document.getElementById('btn-analytics').addEventListener('click', () => {
+            const items = Array.from(itemsMap.values()).filter(i => !i.deleted && i.status === 'wish');
+            const totalValue = items.reduce((sum, i) => sum + (i.price || 0), 0);
+            const weeklySavings = items.reduce((sum, i) => {
+                const insight = getSavingInsight(i.price, i.targetDate);
+                return sum + (insight ? insight.weeklySaving : 0);
+            }, 0);
+            
+            // Simple Category Dist
+            const catCounts = {};
+            items.forEach(i => catCounts[i.category] = (catCounts[i.category] || 0) + 1);
+            const topCat = Object.entries(catCounts).sort((a,b) => b[1]-a[1])[0] || ['None', 0];
+
+            const body = document.getElementById('analytics-body');
+            body.innerHTML = `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                    <div class="glass-panel" style="padding:16px; text-align:center;">
+                        <div style="font-size:1.5rem; font-weight:700; color:var(--accent-color);">${totalValue.toLocaleString()}</div>
+                        <div style="font-size:0.7rem; color:var(--text-tertiary);">Total Value (est)</div>
+                    </div>
+                    <div class="glass-panel" style="padding:16px; text-align:center;">
+                        <div style="font-size:1.5rem; font-weight:700; color:#34C759;">${weeklySavings.toLocaleString()}</div>
+                        <div style="font-size:0.7rem; color:var(--text-tertiary);">Weekly Saving Goal</div>
+                    </div>
+                </div>
+                <div class="glass-panel" style="padding:16px;">
+                    <h4 style="margin:0 0 12px 0;">Category Focus</h4>
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <span>Most wished: <b>${topCat[0]}</b></span>
+                        <span class="tag">${topCat[1]} items</span>
+                    </div>
+                    <div style="margin-top:12px; height:8px; background:#eee; border-radius:4px; overflow:hidden;">
+                        <div style="height:100%; width:${(topCat[1]/items.length)*100}%; background:var(--accent-color);"></div>
+                    </div>
+                </div>
+            `;
+        });
 
         // Board Select Logic
         const boardModal = document.getElementById('select-board-modal');
@@ -227,28 +331,53 @@ export const WishlistView = {
             window.showToast("Saved to board!", "📌");
         };
 
-        // Sync UI
-        const syncUI = () => {
-            if (document.getElementById('search-input')) document.getElementById('search-input').value = currentFilters.search;
-            if (document.getElementById('sort-order')) document.getElementById('sort-order').value = currentFilters.sortOrder;
-            if (document.getElementById('filter-category')) document.getElementById('filter-category').value = currentFilters.category;
-            if (document.getElementById('filter-occasion')) document.getElementById('filter-occasion').value = currentFilters.occasion;
+        // Planner Run Logic (reused)
+        const btnRun = document.getElementById('btn-run-planner');
+        if(btnRun) btnRun.onclick = async () => {
+            const budget = parseFloat(document.getElementById('planner-budget').value);
+            const currency = document.getElementById('planner-currency').value;
+            
+            if(!budget || budget <= 0) return alert("Enter a valid budget.");
 
-            const btnA = document.getElementById('btn-archive-toggle');
-            if (btnA && currentFilters.status === 'archived') {
-                btnA.classList.add('active');
-                btnA.textContent = 'Active Wishes';
+            btnRun.disabled = true;
+            btnRun.innerHTML = 'Thinking...';
+            document.getElementById('planner-results').style.display = 'none';
+
+            try {
+                const allItems = Array.from(itemsMap.values()).filter(i => i.status === 'wish');
+                const plan = await aiService.getPurchasePlan(allItems, budget, currency);
+                
+                if(plan && plan.recommendedItems) {
+                    document.getElementById('planner-results').style.display = 'block';
+                    document.getElementById('planner-summary').innerText = plan.summary || "Here is your plan:";
+                    
+                    const list = document.getElementById('planner-items-list');
+                    list.innerHTML = plan.recommendedItems.map(rec => {
+                        const item = itemsMap.get(rec.itemId);
+                        if(!item) return '';
+                        return `
+                            <div class="glass-panel" style="padding:10px; display:flex; gap:10px; align-items:center;">
+                                <img src="${item.imageUrl}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
+                                <div style="flex:1;">
+                                    <div style="font-weight:600; font-size:0.9rem;">${item.title}</div>
+                                    <div style="font-size:0.8rem; color:var(--text-secondary);">${item.price} ${item.currency}</div>
+                                </div>
+                                <div style="font-size:1.2rem; color:#34C759;">✓</div>
+                            </div>
+                        `;
+                    }).join('');
+                } else {
+                    alert("AI couldn't generate a plan.");
+                }
+            } catch(e) {
+                console.error(e);
+                alert("AI Service Error");
+            } finally {
+                btnRun.disabled = false;
+                btnRun.innerHTML = '🔮 Generate Plan';
             }
-
-            const btnS = document.getElementById('btn-sale-filter');
-            if (btnS && currentFilters.saleOnly) btnS.classList.add('active');
-
-            ['grid', 'timeline', 'gift'].forEach(m => {
-                const btn = document.getElementById(`btn-view-${m}`);
-                if (btn) btn.classList.toggle('active', currentFilters.viewMode === m);
-            });
         };
-        syncUI();
+
         await WishlistView.loadData();
     },
 
@@ -264,9 +393,7 @@ export const WishlistView = {
             itemsMap.clear();
             items.forEach(item => itemsMap.set(item.id, item));
 
-            // Check Milestones
             GamificationService.checkMilestones('add_item', items.length);
-
             WishlistView.renderContent();
         } catch (error) {
             console.error(error);
@@ -280,7 +407,7 @@ export const WishlistView = {
 
         let displayItems = Array.from(itemsMap.values());
 
-        // Filters
+        // Filter Logic
         displayItems = displayItems.filter(item => {
             if (currentFilters.status === 'archived') return item.status === 'archived';
             if (currentFilters.viewMode === 'gift') return item.status === 'wish' && item.occasion;
@@ -290,21 +417,42 @@ export const WishlistView = {
         if (currentFilters.saleOnly) displayItems = displayItems.filter(item => item.onSale);
         if (currentFilters.category !== 'All') displayItems = displayItems.filter(item => item.category === currentFilters.category);
         if (currentFilters.occasion !== 'All') displayItems = displayItems.filter(item => item.occasion === currentFilters.occasion);
+        
+        // Price Filter Logic
+        if (currentFilters.priceRange !== 'All') {
+            displayItems = displayItems.filter(item => {
+                const p = item.price || 0;
+                if (currentFilters.priceRange === '0-500') return p <= 500;
+                if (currentFilters.priceRange === '500-2000') return p > 500 && p <= 2000;
+                if (currentFilters.priceRange === '2000+') return p > 2000;
+                return true;
+            });
+        }
+
         if (currentFilters.search) {
-            const term = currentFilters.search;
+            const term = currentFilters.search.toLowerCase();
             displayItems = displayItems.filter(item =>
                 (item.title && item.title.toLowerCase().includes(term)) ||
                 (item.category && item.category.toLowerCase().includes(term))
             );
         }
 
-        // Sort
+        // Sort Logic
         displayItems.sort((a, b) => {
             switch (currentFilters.sortOrder) {
                 case 'oldest': return (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0);
-                case 'priority': const pMap = { 'High': 3, 'Medium': 2, 'Low': 1 }; return (pMap[b.priority] || 2) - (pMap[a.priority] || 2);
-                case 'date_near': if (!a.targetDate) return 1; if (!b.targetDate) return -1; return new Date(a.targetDate) - new Date(b.targetDate);
-                case 'newest': default: return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
+                case 'priority': 
+                    const pMap = { 'High': 3, 'Medium': 2, 'Low': 1 }; 
+                    return (pMap[b.priority] || 2) - (pMap[a.priority] || 2);
+                case 'price_high': return (b.price || 0) - (a.price || 0);
+                case 'price_low': return (a.price || 0) - (b.price || 0);
+                case 'date_near': 
+                    if (!a.targetDate) return 1; 
+                    if (!b.targetDate) return -1; 
+                    return new Date(a.targetDate) - new Date(b.targetDate);
+                case 'newest': 
+                default: 
+                    return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
             }
         });
 
@@ -318,7 +466,6 @@ export const WishlistView = {
         } else if (currentFilters.viewMode === 'gift') {
             WishlistView.renderGiftMode(container, displayItems);
         } else {
-            // Grid
             const gridHtml = displayItems.map(item => WishlistView.renderCard(item)).join('');
             container.innerHTML = `<div class="masonry-grid">${gridHtml}</div>`;
             WishlistView.bindCardEvents(container);
@@ -357,7 +504,6 @@ export const WishlistView = {
         });
 
         if (datedItems.length > 0) html += `</div>`;
-
         if (undatedItems.length > 0) {
             html += `<div class="timeline-group"><div class="timeline-header">Someday</div>`;
             undatedItems.forEach(item => {
@@ -372,7 +518,6 @@ export const WishlistView = {
             });
             html += `</div>`;
         }
-
         html += `</div>`;
         container.innerHTML = html;
         WishlistView.bindCardEvents(container);
@@ -386,15 +531,17 @@ export const WishlistView = {
             groups[occ].push(i);
         });
 
-        let html = `<div style="padding-bottom:100px;">`;
+        let html = `<div class="gift-mode-container" style="padding-bottom:100px; display:flex; flex-direction:column; gap:24px;">`;
         Object.keys(groups).forEach(occ => {
             html += `
-                <div class="gift-mode-header">
-                    <h3>🎁 ${occ}</h3>
-                    <span class="tag">${groups[occ].length} wishes</span>
-                </div>
-                <div class="scroll-row">
-                    ${groups[occ].map(item => WishlistView.renderCard(item, 'gift')).join('')}
+                <div class="gift-group">
+                    <div class="gift-mode-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h3 style="margin:0; font-size:1.2rem;">🎁 ${occ}</h3>
+                        <span class="tag">${groups[occ].length} wishes</span>
+                    </div>
+                    <div class="scroll-row" style="display:flex; overflow-x:auto; gap:16px; padding-bottom:12px;">
+                        ${groups[occ].map(item => WishlistView.renderCard(item, 'gift')).join('')}
+                    </div>
                 </div>
             `;
         });
@@ -406,22 +553,35 @@ export const WishlistView = {
     renderCard: (item, context = 'grid') => {
         const isGift = context === 'gift';
         const giftClass = item.occasion ? 'card-gift' : '';
+        const priorityClass = item.priority === 'High' ? 'card-priority-high' : '';
         const timeData = getCountdown(item.targetDate);
+        const financialData = getSavingInsight(item.price, item.targetDate);
+
         let badges = '';
         if (timeData) badges += `<span class="time-tag ${timeData.class}">⏳ ${timeData.text}</span>`;
         if (item.visibility === 'private') badges += `<span class="time-tag tag-far" style="margin-left:4px;">🔒</span>`;
-        if (item.occasion) badges += `<span class="time-tag tag-far" style="margin-left:4px;">🎉 ${item.occasion}</span>`;
+        if (item.occasion && !isGift) badges += `<span class="time-tag tag-far" style="margin-left:4px;">🎉 ${item.occasion}</span>`;
 
-        const descTitle = item.description ? `title="${item.description.replace(/"/g, '&quot;')}"` : '';
+        let financialBadge = '';
+        if (financialData && item.status === 'wish') {
+            financialBadge = `<div style="margin-top:6px; font-size:0.75rem; color:var(--accent-color); font-weight:600;">
+                💡 Save ${financialData.weeklySaving} ${item.currency}/wk
+            </div>`;
+        }
 
         return `
-            <article class="glass-panel card ${item.isOwned ? 'card-owned' : ''} ${giftClass}" data-id="${item.id}" ${descTitle} style="${isGift ? 'min-width:200px; display:inline-block; margin-right:16px;' : ''}">
+            <article class="glass-panel card ${item.isOwned ? 'card-owned' : ''} ${giftClass} ${priorityClass}" data-id="${item.id}" 
+                style="${isGift ? 'min-width:200px; display:inline-block;' : ''}">
+                
                 <div class="card-actions" style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:4px;">
                     <button class="card-action-btn edit-btn" style="position:static; opacity:1;">✎</button>
                     <button class="card-action-btn delete-btn" style="position:static; opacity:1; color:#ff3b30;">&times;</button>
                 </div>
                 <button class="card-action-btn pin-btn" style="position:absolute; top:10px; left:10px; z-index:10; opacity:1; color:#007AFF;" title="Add to Board">📌</button>
-                ${!item.isOwned ? `<button class="card-action-btn closet-btn" style="position:absolute; top:50px; left:10px; z-index:10; opacity:1; color:#34C759;" title="Manifest!">✔</button>` : ''}
+                
+                ${!item.isOwned && item.status === 'wish' ? 
+                    `<button class="card-action-btn closet-btn" style="position:absolute; top:50px; left:10px; z-index:10; opacity:1; color:#34C759;" title="Manifest!">✔</button>` 
+                    : ''}
                 
                 <div class="card-img-container">
                     <img src="${item.imageUrl}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
@@ -433,6 +593,7 @@ export const WishlistView = {
                         <span class="tag">${item.category}</span>
                         <span class="price">${item.price} ${item.currency}</span>
                     </div>
+                    ${financialBadge}
                 </div>
             </article>
         `;
@@ -467,5 +628,30 @@ export const WishlistView = {
                 window.openBoardSelect(card.dataset.id, card.querySelector('img').src);
             };
         });
+    }
+};
+
+// Global Handlers (Existing)
+window.handleDeleteItem = async (id) => {
+    if (confirm(i18n.t('common.confirm') || "Delete this item?")) {
+        try {
+            await firestoreService.deleteItem(id);
+            WishlistView.loadData();
+            window.showToast("Item archived.", "📦");
+        } catch(e) { console.error(e); }
+    }
+};
+window.handleEditItem = async (id) => {
+    const item = itemsMap.get(id);
+    if (item && addItemModal) addItemModal.open(item);
+};
+window.handleMoveToCloset = async (id) => {
+    if (confirm("Mark as bought and move to Closet?")) {
+        try {
+            await firestoreService.markAsOwned(id);
+            window.showToast("Manifested!", "🎉");
+            GamificationService.triggerConfetti();
+            WishlistView.loadData();
+        } catch(e) { console.error(e); }
     }
 };

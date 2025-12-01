@@ -1,84 +1,62 @@
-import { i18n } from '../services/LocalizationService.js';
+/* public/js/views/AppShell.js */
 import { authService } from '../services/AuthService.js';
+import { i18n } from '../services/LocalizationService.js';
 
 export const AppShell = {
-    render: async (childView) => {
+    render: async () => {
         const user = authService.currentUser;
-        const profile = authService.userProfile;
+        const photoURL = user?.photoURL || 'https://placehold.co/40';
 
-        // Navigation config
-        const navItems = [
-            { path: '/app/home', icon: '🏠', label: i18n.t('nav.home') },
-            { path: '/app/wishlist', icon: '✨', label: i18n.t('nav.wishlist') },
-            { path: '/app/closet', icon: '🧥', label: i18n.t('nav.closet') },
-            { path: '/app/inspo', icon: '📌', label: i18n.t('nav.inspo') },
-            { path: '/app/combos', icon: '🎨', label: i18n.t('nav.combos') },
-            { path: '/app/friends', icon: '👥', label: i18n.t('nav.friends') },
-            { path: '/app/profile', icon: '👤', label: i18n.t('nav.profile') }
-        ];
-
-        // 1. Render Child View Content
-        // We await the child view's render method so we can inject it into the shell
-        const childHtml = await childView.render();
-
-        // 2. Return Full Shell HTML
         return `
-            <div class="app-shell">
-                <!-- Desktop Sidebar -->
-                <aside class="shell-sidebar">
-                    <div class="shell-logo">
-                        <img src="img/logo.png" alt="WishOne">
+            <div id="app-shell" class="app-shell">
+                <header class="app-topbar">
+                    <div class="topbar-left">
+                        <div class="app-logo">WishOne</div>
                     </div>
-                    <nav class="shell-nav">
-                        ${navItems.map(item => `
-                            <a href="#${item.path}" class="shell-nav-item ${window.location.hash.includes(item.path) ? 'active' : ''}">
-                                <span class="nav-icon">${item.icon}</span>
-                                <span class="nav-label">${item.label}</span>
-                            </a>
-                        `).join('')}
+                    
+                    <nav class="topbar-nav desktop-only">
+                        <a href="#/app/home" class="nav-item">${i18n.t('nav.home')}</a>
+                        <a href="#/app/wishlist" class="nav-item">${i18n.t('nav.wishlist')}</a>
+                        <a href="#/app/inspo" class="nav-item">${i18n.t('nav.inspo')}</a>
+                        <a href="#/app/closet" class="nav-item">${i18n.t('nav.closet')}</a>
+                        <a href="#/app/combos" class="nav-item">${i18n.t('nav.combos')}</a>
+                        <a href="#/app/friends" class="nav-item">${i18n.t('nav.friends')}</a>
                     </nav>
-                    <div class="shell-footer">
-                        <a href="#/settings" class="shell-nav-item">
-                            <span class="nav-icon">⚙️</span>
-                            <span class="nav-label">${i18n.t('nav.settings')}</span>
-                        </a>
-                    </div>
-                </aside>
 
-                <!-- Mobile Header -->
-                <header class="shell-mobile-header">
-                    <img src="img/logo.png" alt="WishOne" height="32">
-                    <div class="user-avatar-small" onclick="window.location.hash='#/settings'">
-                        <img src="${profile?.photoURL || 'https://placehold.co/100'}" style="width:32px; height:32px; border-radius:50%; object-fit:cover;">
+                    <div class="topbar-right">
+                        <a href="#/app/settings" class="icon-btn" title="Settings">⚙️</a>
+                        <a href="#/app/profile" class="avatar-btn">
+                            <img src="${photoURL}" alt="Profile">
+                        </a>
                     </div>
                 </header>
 
-                <!-- Main Content Area -->
-                <main class="shell-content" id="shell-main">
-                    ${childHtml}
-                </main>
+                <main id="shell-content" class="app-content">
+                    </main>
 
-                <!-- Mobile Bottom Bar -->
-                <nav class="shell-bottom-bar">
-                    ${navItems.slice(0, 5).map(item => `
-                        <a href="#${item.path}" class="bottom-nav-item ${window.location.hash.includes(item.path) ? 'active' : ''}">
-                            <span class="nav-icon">${item.icon}</span>
-                        </a>
-                    `).join('')}
-                    <a href="#/app/profile" class="bottom-nav-item ${window.location.hash.includes('profile') ? 'active' : ''}">
-                        <span class="nav-icon">👤</span>
+                <nav class="mobile-tabbar mobile-only">
+                    <a href="#/app/home" class="nav-item">
+                        <span class="icon">🏠</span>
+                        <span class="label">${i18n.t('nav.home')}</span>
+                    </a>
+                    <a href="#/app/wishlist" class="nav-item">
+                        <span class="icon">✨</span>
+                        <span class="label">${i18n.t('nav.wishlist')}</span>
+                    </a>
+                    <a href="#/app/closet" class="nav-item">
+                        <span class="icon">🧥</span>
+                        <span class="label">${i18n.t('nav.closet')}</span>
+                    </a>
+                    <a href="#/app/profile" class="nav-item">
+                        <span class="icon">👤</span>
+                        <span class="label">${i18n.t('nav.profile')}</span>
                     </a>
                 </nav>
             </div>
         `;
     },
 
-    afterRender: async (childView) => {
-        // Hide the old floating header if it exists (from previous modules)
-        const oldHeader = document.querySelector('.floating-header');
-        if (oldHeader) oldHeader.style.display = 'none';
-
-        // Run child logic
-        if (childView.afterRender) await childView.afterRender();
+    afterRender: async () => {
+        // Any global shell logic (e.g. notifications listener)
     }
 };

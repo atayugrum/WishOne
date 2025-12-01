@@ -1,68 +1,20 @@
 /* public/js/views/ProfileView.js */
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
-import { aiService } from '../services/AIService.js';
 import { i18n } from '../services/LocalizationService.js';
+import { GamificationService } from '../services/GamificationService.js';
+import { aiService } from '../services/AIService.js';
+import { FEATURES } from '../config/limits.js';
+import { premiumModal } from '../components/PremiumModal.js';
 
 export const ProfileView = {
     render: async () => {
-        const user = authService.currentUser;
-        const profile = authService.userProfile;
-        if (!user || !profile) return `<div class="empty-state">Login required.</div>`;
-
-        let stats = { totalWishes: 0, fulfilled: 0 };
-        try { stats = await firestoreService.getUserStats(user.uid); } catch (e) { }
-
-        const lvl = getLevelInfo(stats.fulfilled);
-        const progress = Math.min(100, ((stats.fulfilled - (lvl.prev || 0)) / (lvl.next - (lvl.prev || 0))) * 100) || 0; // Simplified
-
         return `
-            <div class="view-header"><h1>${i18n.t('profile.title')}</h1></div>
-            <div class="glass-panel" style="max-width: 600px; margin: 0 auto; padding: 32px;">
-                
-                <!-- Header -->
-                <div style="text-align:center; margin-bottom:32px;">
-                    <img src="${profile.photoURL}" style="width:100px; height:100px; border-radius:50%; object-fit:cover;">
-                    <h3 style="margin-top:12px;">${profile.displayName}</h3>
-                    <p style="color:var(--text-secondary);">@${profile.username}</p>
-                </div>
-
-                <!-- Level & Stats -->
-                <div class="analytics-card" style="margin-bottom:32px; padding:20px; background:rgba(0,0,0,0.03); border-radius:16px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <span style="font-weight:700; color:var(--accent-color);">Level ${lvl.level}: ${lvl.title}</span>
-                        <span style="font-size:0.8rem; opacity:0.6;">${stats.fulfilled} / ${lvl.next} Fulfilled</span>
-                    </div>
-                    <div class="level-progress-bar"><div class="fill" style="width:${(stats.fulfilled / lvl.next) * 100}%"></div></div>
-                    
-                    <div style="display:flex; margin-top:20px; justify-content:space-around; text-align:center;">
-                        <div><div style="font-size:1.5rem; font-weight:700;">${stats.totalWishes}</div><small>Active Wishes</small></div>
-                        <div><div style="font-size:1.5rem; font-weight:700;">${stats.fulfilled}</div><small>Completed</small></div>
-                    </div>
-                </div>
-
-                <!-- Category Chart Placeholder -->
-                <div id="category-chart" style="margin-bottom:32px;">
-                    <h4 style="margin-bottom:12px;">Category Distribution</h4>
-                    <div id="chart-bars" style="display:flex; gap:4px; height:8px; border-radius:4px; overflow:hidden;">
-                        <!-- JS injected -->
-                    </div>
-                    <div id="chart-legend" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px; font-size:0.75rem;"></div>
-                </div>
-
-                <!-- Style DNA -->
-                <div style="margin-bottom:32px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                        <h4>Style DNA</h4>
-                        <button class="btn-magic" id="btn-analyze-style" style="padding:4px 10px; font-size:0.75rem;">Analyze</button>
-                    </div>
-                    <div id="style-dna-content" class="glass-panel" style="padding:16px; text-align:center; color:var(--text-secondary);">
-                        Tap analyze to reveal your vibe.
-                    </div>
-                </div>
-
-                <!-- Edit & Danger Zone Omitted for Brevity (Same as before) -->
-                <button class="btn-text" onclick="window.location.hash='#/settings'" style="width:100%; text-align:center; margin-top:20px;">Go to Settings</button>
+            <div class="view-header">
+                <h1>${i18n.t('nav.profile')}</h1>
+            </div>
+            <div id="profile-content" class="fade-in">
+                <div class="loading-spinner">${i18n.t('common.loading')}</div>
             </div>
         `;
     },
@@ -71,52 +23,189 @@ export const ProfileView = {
         const user = authService.currentUser;
         if (!user) return;
 
-        // Render Chart
-        const [wishes, closet] = await Promise.all([
-            firestoreService.getWishlist(user.uid, user.uid),
-            firestoreService.getCloset(user.uid)
-        ]);
-        const allItems = [...wishes, ...closet];
-        const counts = {};
-        allItems.forEach(i => counts[i.category] = (counts[i.category] || 0) + 1);
+        const container = document.getElementById('profile-content');
+        
+        try {
+            const [profile, stats, items] = await Promise.all([
+                firestoreService.getUserProfile(user.uid),
+                firestoreService.getUserStats(user.uid),
+                firestoreService.getCloset(user.uid) // Need items for style analysis
+            ]);
 
-        const chartBars = document.getElementById('chart-bars');
-        const chartLegend = document.getElementById('chart-legend');
-        const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEEAD'];
+            const level = GamificationService.calculateLevel(stats.fulfilled || 0);
+            const styleProfile = profile.styleProfile || null;
 
-        let barHtml = '';
-        let legendHtml = '';
-        let colorIdx = 0;
+            // Generate Style Tags HTML
+            let styleHtml = `
+                <div style="text-align:center; padding:20px; color:var(--text-tertiary);">
+                    <p>Unlock your Style DNA to get personalized advice.</p>
+                    <button class="btn-magic" id="btn-analyze-style" style="margin-top:12px;">✨ Analyze My Style</button>
+                </div>
+            `;
 
-        Object.keys(counts).forEach(cat => {
-            const pct = (counts[cat] / allItems.length) * 100;
-            const color = colors[colorIdx % colors.length];
-            barHtml += `<div style="width:${pct}%; background:${color};"></div>`;
-            legendHtml += `<div style="display:flex; align-items:center; gap:4px;"><span style="width:8px; height:8px; background:${color}; border-radius:50%;"></span>${cat}</div>`;
-            colorIdx++;
-        });
+            if (styleProfile) {
+                styleHtml = `
+                    <div style="text-align:left;">
+                        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+                            ${(styleProfile.vibes || []).map(v => `<span class="tag" style="background:var(--accent-color); color:white;">${v}</span>`).join('')}
+                            ${(styleProfile.colors || []).map(c => `<span class="tag">${c}</span>`).join('')}
+                        </div>
+                        <p style="font-size:0.9rem; font-style:italic;">"${styleProfile.summary}"</p>
+                        <div style="margin-top:12px; background:rgba(0,0,0,0.03); padding:8px; border-radius:8px; font-size:0.85rem;">
+                            <b>💡 Tip:</b> ${styleProfile.shoppingAdvice}
+                        </div>
+                        <button class="btn-text" id="btn-analyze-style" style="margin-top:12px; font-size:0.8rem;">🔄 Re-analyze</button>
+                    </div>
+                `;
+            }
 
-        if (chartBars) chartBars.innerHTML = barHtml;
-        if (chartLegend) chartLegend.innerHTML = legendHtml;
+            container.innerHTML = `
+                <div class="glass-panel" style="padding:24px; text-align:center; margin-bottom:24px; position:relative;">
+                    <button id="btn-edit-profile" class="btn-text" style="position:absolute; top:16px; right:16px;">✎ Edit</button>
+                    
+                    <div style="position:relative; display:inline-block;">
+                        <img src="${profile.photoURL || 'https://placehold.co/100'}" style="width:100px; height:100px; border-radius:50%; object-fit:cover; border:3px solid var(--accent-color);">
+                        <div style="position:absolute; bottom:0; right:0; background:var(--accent-color); color:white; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:0.8rem;">
+                            ${level}
+                        </div>
+                    </div>
+                    
+                    <h2 style="margin:12px 0 4px;">${profile.displayName || 'User'}</h2>
+                    <p style="color:var(--text-tertiary); font-size:0.9rem;">@${profile.username || 'username'}</p>
+                    
+                    <div id="bio-display" style="margin-top:12px; color:var(--text-secondary); max-width:400px; margin-left:auto; margin-right:auto;">
+                        ${profile.bio || 'No bio yet.'}
+                    </div>
 
-        // Style Analyzer (Same logic as before)
-        const btnStyle = document.getElementById('btn-analyze-style');
-        if (btnStyle) {
-            btnStyle.onclick = async () => {
-                const box = document.getElementById('style-dna-content');
-                box.innerHTML = `Analyzing...`;
-                try {
-                    const profile = await aiService.getStyleProfile(allItems);
-                    box.innerHTML = `<strong>${profile.vibe}</strong><br>${profile.summary}`;
-                } catch (e) { box.innerHTML = "Error."; }
+                    <form id="profile-edit-form" style="display:none; margin-top:16px; max-width:400px; margin-left:auto; margin-right:auto; text-align:left;">
+                        <div class="form-group">
+                            <label>Display Name</label>
+                            <input name="displayName" value="${profile.displayName || ''}">
+                        </div>
+                        <div class="form-group">
+                            <label>Bio</label>
+                            <textarea name="bio" rows="3">${profile.bio || ''}</textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Profile Visibility</label>
+                            <select name="profileVisibility">
+                                <option value="public" ${profile.profileVisibility === 'public' ? 'selected' : ''}>🌍 Public</option>
+                                <option value="friends_only" ${profile.profileVisibility === 'friends_only' ? 'selected' : ''}>👥 Friends Only</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; gap:8px; margin-top:16px;">
+                            <button type="submit" class="btn-primary" style="flex:1;">Save</button>
+                            <button type="button" id="btn-cancel-edit" class="btn-text" style="flex:1;">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="glass-panel" style="padding:20px; margin-bottom:24px;">
+                    <h3 style="margin-top:0;">🧬 Style DNA</h3>
+                    <div id="style-dna-content">
+                        ${styleHtml}
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; margin-bottom:24px;">
+                    <div class="glass-panel" style="padding:16px; text-align:center;">
+                        <div style="font-size:1.5rem; font-weight:700; color:var(--accent-color);">${stats.totalWishes || 0}</div>
+                        <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-tertiary);">Wishes</div>
+                    </div>
+                    <div class="glass-panel" style="padding:16px; text-align:center;">
+                        <div style="font-size:1.5rem; font-weight:700; color:#34C759;">${stats.fulfilled || 0}</div>
+                        <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-tertiary);">Fulfilled</div>
+                    </div>
+                    <div class="glass-panel" style="padding:16px; text-align:center;">
+                        <div style="font-size:1.5rem; font-weight:700; color:#007AFF;" id="friend-count">-</div>
+                        <div style="font-size:0.75rem; text-transform:uppercase; color:var(--text-tertiary);">Friends</div>
+                    </div>
+                </div>
+
+                <div class="glass-panel" style="padding:0; overflow:hidden;">
+                    <button class="list-item-btn" onclick="window.location.hash='#settings'">
+                        <span>⚙️ Settings</span>
+                        <span>›</span>
+                    </button>
+                    <button class="list-item-btn" onclick="authService.logout()">
+                        <span style="color:#ff3b30;">🚪 Log Out</span>
+                    </button>
+                </div>
+            `;
+
+            // Friend Count
+            firestoreService.getFriends(user.uid).then(friends => {
+                const el = document.getElementById('friend-count');
+                if(el) el.innerText = friends.length;
+            });
+
+            // Analyze Handler
+            const bindAnalyze = () => {
+                const btn = document.getElementById('btn-analyze-style');
+                if(!btn) return;
+                
+                btn.onclick = async () => {
+                    if (!authService.canUseFeature(FEATURES.AI_COMBOS)) { premiumModal.open(); return; } // Use similar feature limit
+
+                    btn.disabled = true;
+                    btn.innerHTML = 'Analyzing...';
+                    
+                    try {
+                        const styleData = await aiService.getStyleProfile(items);
+                        if(styleData && styleData.vibes) {
+                            // Save to profile
+                            await firestoreService.updateUserProfile(user.uid, { styleProfile: styleData });
+                            window.showToast("Style DNA Updated!", "🧬");
+                            ProfileView.afterRender(); // Refresh
+                        } else {
+                            window.showToast("Could not analyze style.");
+                        }
+                    } catch(e) {
+                        console.error(e);
+                        window.showToast("AI Service Error");
+                    } finally {
+                        btn.disabled = false;
+                        btn.innerHTML = '✨ Analyze My Style';
+                    }
+                };
             };
+            bindAnalyze();
+
+            // Edit Profile Handlers
+            const btnEdit = document.getElementById('btn-edit-profile');
+            const btnCancel = document.getElementById('btn-cancel-edit');
+            const form = document.getElementById('profile-edit-form');
+            const bioDisplay = document.getElementById('bio-display');
+
+            btnEdit.onclick = () => {
+                bioDisplay.style.display = 'none';
+                btnEdit.style.display = 'none';
+                form.style.display = 'block';
+            };
+
+            btnCancel.onclick = () => {
+                form.style.display = 'none';
+                bioDisplay.style.display = 'block';
+                btnEdit.style.display = 'block';
+            };
+
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const fd = new FormData(form);
+                const updates = {
+                    displayName: fd.get('displayName'),
+                    bio: fd.get('bio'),
+                    profileVisibility: fd.get('profileVisibility')
+                };
+                
+                await firestoreService.updateUserProfile(user.uid, updates);
+                window.showToast('Profile updated');
+                ProfileView.afterRender();
+            };
+
+        } catch (e) {
+            console.error(e);
+            container.innerHTML = `<div class="empty-state">Error loading profile.</div>`;
         }
     }
 };
-
-function getLevelInfo(count) {
-    if (count < 10) return { level: 1, next: 10, title: "Dreamer" };
-    if (count < 25) return { level: 2, next: 25, title: "Planner" };
-    if (count < 50) return { level: 3, next: 50, title: "Manifester" };
-    return { level: 4, next: 1000, title: "Visionary" };
-}

@@ -1,42 +1,23 @@
 /* public/js/views/FriendsView.js */
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
-import { i18n } from '../services/LocalizationService.js';
-import { apiCall } from '../config/api.js';
-import { premiumModal } from '../components/PremiumModal.js';
-import { aiService } from '../services/AIService.js';
+import { FriendWishlistView } from './FriendWishlistView.js'; // For visiting
 
 export const FriendsView = {
     render: async () => {
-        const user = authService.currentUser;
-        if (!user) return `<div class="view-header"><h1>Login Required</h1></div>`;
-
         return `
             <div class="view-header">
-                <h1>${i18n.t('friends.title')}</h1>
-                <p>${i18n.t('friends.subtitle')}</p>
+                <h1>Friends</h1>
+            </div>
+            
+            <div class="auth-tabs" style="margin-bottom:20px;">
+                <div class="auth-tab active" id="tab-my-friends">My Friends</div>
+                <div class="auth-tab" id="tab-requests">Requests</div>
+                <div class="auth-tab" id="tab-search">Find People</div>
             </div>
 
-            <div style="max-width: 600px; margin: 0 auto;">
-                <div class="glass-panel" style="padding: 16px; margin-bottom: 32px; display:flex; gap:12px; align-items:center;">
-                    <span style="font-size:1.2rem;">🔍</span>
-                    <input type="text" id="user-search-input" placeholder="Find by username..." style="flex:1; border:none; background:transparent; font-size:1rem; outline:none;">
-                </div>
-                
-                <div id="search-results" style="margin-bottom:32px; display:none;">
-                    <h3 style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:12px;">Search Results</h3>
-                    <div id="search-results-list"></div>
-                </div>
-
-                <div id="pending-requests-section" style="display:none; margin-bottom:32px;">
-                    <h3 style="font-size:0.9rem; color:var(--accent-color); margin-bottom:12px;">💌 Pending Requests</h3>
-                    <div id="requests-list"></div>
-                </div>
-
-                <h3 style="font-size:0.9rem; color:var(--text-secondary); margin-bottom:12px;">Your Friends</h3>
-                <div id="friends-list" class="friends-list">
-                    <div class="loading-spinner">${i18n.t('common.loading')}</div>
-                </div>
+            <div id="friends-content" class="fade-in">
+                <div class="loading-spinner">Loading...</div>
             </div>
         `;
     },
@@ -45,163 +26,164 @@ export const FriendsView = {
         const user = authService.currentUser;
         if (!user) return;
 
-        const listContainer = document.getElementById('friends-list');
-        const requestsContainer = document.getElementById('pending-requests-section');
-        const requestsList = document.getElementById('requests-list');
-        const searchInput = document.getElementById('user-search-input');
-        const searchResults = document.getElementById('search-results');
-        const searchList = document.getElementById('search-results-list');
-
-        // --- 1. Load Data ---
-        const refreshAll = async () => {
-            await Promise.all([loadFriends(), loadRequests()]);
+        const container = document.getElementById('friends-content');
+        
+        // --- TABS LOGIC ---
+        const tabs = {
+            'tab-my-friends': () => renderMyFriends(),
+            'tab-requests': () => renderRequests(),
+            'tab-search': () => renderSearch()
         };
 
-        const loadRequests = async () => {
-            try {
-                const requests = await firestoreService.getIncomingRequests(user.uid);
-                if (requests.length > 0) {
-                    requestsContainer.style.display = 'block';
-                    requestsList.innerHTML = requests.map(req => `
-                        <div class="glass-panel" style="padding:12px; margin-bottom:10px; display:flex; align-items:center; justify-content:space-between;">
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <img src="${req.fromPhoto || 'https://placehold.co/100'}" style="width:40px; height:40px; border-radius:50%; object-fit:cover;">
-                                <div>
-                                    <div style="font-weight:600;">${req.fromName}</div>
-                                    <div style="font-size:0.8rem; color:var(--text-secondary);">Wants to be friends</div>
-                                </div>
-                            </div>
-                            <div style="display:flex; gap:8px;">
-                                <button class="btn-primary" style="padding:6px 12px; font-size:0.8rem;" onclick="window.handleRequest('accept', '${req.fromUid}')">Accept</button>
-                                <button class="btn-text" style="color:#ff3b30; font-size:0.8rem;" onclick="window.handleRequest('reject', '${req.fromUid}')">Ignore</button>
-                            </div>
-                        </div>
-                    `).join('');
-                } else {
-                    requestsContainer.style.display = 'none';
-                }
-            } catch (e) { console.error(e); }
-        };
+        Object.keys(tabs).forEach(id => {
+            document.getElementById(id).onclick = () => {
+                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+                document.getElementById(id).classList.add('active');
+                tabs[id]();
+            };
+        });
 
-        const loadFriends = async () => {
-            try {
-                const friends = await firestoreService.getFriends(user.uid);
-                if (friends.length === 0) {
-                    listContainer.innerHTML = `
-                        <div class="glass-panel empty-state-card" style="margin-top:0;">
-                            <span class="empty-icon">👋</span>
-                            <h3 class="empty-title">${i18n.t('friends.empty')}</h3>
-                        </div>`;
-                    return;
-                }
+        // Default
+        renderMyFriends();
 
-                listContainer.innerHTML = friends.map(friend => `
-                    <div class="glass-panel friend-card" onclick="window.location.hash='#/friend/${friend.uid}'" style="cursor:pointer; display:flex; align-items:center; padding:16px; margin-bottom:16px; gap:16px; transition:transform 0.2s;">
-                        <img src="${friend.avatarUrl || 'https://placehold.co/100'}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">
-                        <div style="flex:1;">
-                            <h3 style="margin:0; font-size:1rem;">${friend.displayName}</h3>
-                            <p style="margin:0; font-size:0.8rem; color:var(--text-secondary);">@${friend.username || 'user'}</p>
-                        </div>
-                        <div style="font-size:1.2rem; color:var(--text-tertiary);">➔</div>
-                    </div>
-                `).join('');
-            } catch (e) { listContainer.innerHTML = `<p>Error loading friends.</p>`; }
-        };
+        // --- SUB-VIEWS ---
 
-        // --- 2. Search Logic ---
-        let debounceTimer;
-        searchInput.addEventListener('input', (e) => {
-            clearTimeout(debounceTimer);
-            const term = e.target.value.trim();
-            if (term.length < 3) {
-                searchResults.style.display = 'none';
+        async function renderMyFriends() {
+            container.innerHTML = '<div class="loading-spinner"></div>';
+            const friends = await firestoreService.getFriends(user.uid);
+            
+            if (friends.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <span style="font-size:3rem;">👥</span>
+                        <h3>No friends yet</h3>
+                        <p>Go to "Find People" to add your friends!</p>
+                    </div>`;
                 return;
             }
 
-            debounceTimer = setTimeout(async () => {
-                searchList.innerHTML = `<div class="loading-spinner">Searching...</div>`;
-                searchResults.style.display = 'block';
+            container.innerHTML = `<div class="list-group">${friends.map(f => `
+                <div class="glass-panel list-item" style="display:flex; align-items:center; gap:12px; padding:12px;">
+                    <img src="${f.avatarUrl || 'https://placehold.co/50'}" style="width:50px; height:50px; border-radius:50%; object-fit:cover;">
+                    <div style="flex:1;">
+                        <div style="font-weight:600;">${f.displayName}</div>
+                        <div style="font-size:0.8rem; color:var(--text-tertiary);">@${f.username}</div>
+                    </div>
+                    <button class="btn-primary btn-visit" data-uid="${f.uid}" style="padding:6px 12px; font-size:0.85rem;">Visit</button>
+                </div>
+            `).join('')}</div>`;
+
+            container.querySelectorAll('.btn-visit').forEach(btn => {
+                btn.onclick = () => visitFriend(btn.dataset.uid);
+            });
+        }
+
+        async function renderRequests() {
+            container.innerHTML = '<div class="loading-spinner"></div>';
+            const reqs = await firestoreService.getIncomingRequests(user.uid);
+            
+            if (reqs.length === 0) {
+                container.innerHTML = `<div class="empty-state"><p>No pending requests.</p></div>`;
+                return;
+            }
+
+            container.innerHTML = reqs.map(r => `
+                <div class="glass-panel" style="padding:16px; margin-bottom:12px; display:flex; align-items:center; gap:12px;">
+                    <img src="${r.fromPhoto || 'https://placehold.co/50'}" style="width:40px; height:40px; border-radius:50%;">
+                    <div style="flex:1;">
+                        <div><b>${r.fromName}</b></div>
+                        <div style="font-size:0.8rem; color:var(--text-tertiary);">wants to be friends</div>
+                    </div>
+                    <button class="btn-primary btn-accept" data-uid="${r.fromUid}" style="background:#34C759;">✓</button>
+                    <button class="btn-text btn-reject" data-uid="${r.fromUid}" style="color:#ff3b30;">✕</button>
+                </div>
+            `).join('');
+
+            container.querySelectorAll('.btn-accept').forEach(btn => {
+                btn.onclick = async () => {
+                    await firestoreService.acceptFriendRequest(user.uid, btn.dataset.uid);
+                    window.showToast('Friend added!');
+                    renderRequests(); // Refresh
+                };
+            });
+
+            container.querySelectorAll('.btn-reject').forEach(btn => {
+                btn.onclick = async () => {
+                    await firestoreService.rejectFriendRequest(user.uid, btn.dataset.uid);
+                    renderRequests();
+                };
+            });
+        }
+
+        function renderSearch() {
+            container.innerHTML = `
+                <div style="margin-bottom:20px;">
+                    <div class="glass-panel" style="display:flex; padding:8px 12px;">
+                        <input id="user-search-input" placeholder="Search username..." style="border:none; background:transparent; width:100%; outline:none;">
+                        <button id="btn-user-search">🔍</button>
+                    </div>
+                </div>
+                <div id="search-results"></div>
+            `;
+
+            const input = document.getElementById('user-search-input');
+            const btn = document.getElementById('btn-user-search');
+            const results = document.getElementById('search-results');
+
+            const doSearch = async () => {
+                const term = input.value.trim();
+                if (term.length < 3) return;
+                results.innerHTML = '<div class="loading-spinner"></div>';
+                
                 try {
                     const users = await firestoreService.searchUsers(term);
-                    if (users.length === 0) {
-                        searchList.innerHTML = `<p style="padding:12px; color:#999; text-align:center;">No users found.</p>`;
-                        return;
-                    }
                     // Filter out self
                     const filtered = users.filter(u => u.uid !== user.uid);
 
-                    searchList.innerHTML = filtered.map(u => `
-                        <div class="glass-panel" style="padding:12px; margin-bottom:8px; display:flex; align-items:center; justify-content:space-between;">
-                            <div style="display:flex; align-items:center; gap:12px;">
-                                <img src="${u.photoURL || 'https://placehold.co/100'}" style="width:40px; height:40px; border-radius:50%;">
-                                <div>
-                                    <div style="font-weight:600;">${u.displayName}</div>
-                                    <div style="font-size:0.8rem; color:#666;">@${u.username}</div>
-                                </div>
+                    if (filtered.length === 0) {
+                        results.innerHTML = `<p style="text-align:center; color:var(--text-tertiary);">No users found.</p>`;
+                        return;
+                    }
+
+                    results.innerHTML = filtered.map(u => `
+                        <div class="glass-panel" style="display:flex; align-items:center; gap:12px; padding:12px; margin-bottom:8px;">
+                            <img src="${u.photoURL || 'https://placehold.co/50'}" style="width:40px; height:40px; border-radius:50%;">
+                            <div style="flex:1;">
+                                <div style="font-weight:600;">${u.displayName}</div>
+                                <div style="font-size:0.8rem;">@${u.username}</div>
                             </div>
-                            <button class="btn-primary" style="padding:6px 12px; font-size:0.8rem;" onclick="window.sendRequest('${u.uid}')">Add</button>
+                            <button class="btn-primary btn-add-friend" data-username="${u.username}">+ Add</button>
                         </div>
                     `).join('');
-                } catch (e) { console.error(e); searchList.innerHTML = "Error searching."; }
-            }, 500);
-        });
 
-        // --- 3. Handlers ---
-        window.handleRequest = async (action, uid) => {
-            try {
-                if (action === 'accept') {
-                    await firestoreService.acceptFriendRequest(user.uid, uid);
-                    window.showToast("Friend Added!", "🎉");
-                } else {
-                    await firestoreService.rejectFriendRequest(user.uid, uid);
-                }
-                refreshAll();
-            } catch (e) { alert("Action failed"); }
-        };
+                    results.querySelectorAll('.btn-add-friend').forEach(b => {
+                        b.onclick = async () => {
+                            try {
+                                b.disabled = true;
+                                b.innerText = '...';
+                                await firestoreService.sendFriendRequest(user.uid, b.dataset.username);
+                                b.innerText = 'Sent';
+                                window.showToast('Request sent');
+                            } catch (err) {
+                                alert(err.message);
+                                b.disabled = false;
+                                b.innerText = '+ Add';
+                            }
+                        };
+                    });
 
-        window.sendRequest = async (uid) => {
-            // In a real app we'd need the username, but service handles finding the doc. 
-            // But wait, sendFriendRequest takes email/username. 
-            // Let's update service to take UID or just use the username from search result.
-            // Simpler: Update service to handle UID directly? 
-            // Actually, let's just assume the service needs updating or we pass username. 
-            // The search result has username.
-            const u = document.querySelector(`button[onclick="window.sendRequest('${uid}')"]`).parentElement.parentElement.querySelector('div:nth-child(2)').innerText;
-            // That's messy. Let's fix service to be robust or just pass username.
-            // Actually, in the refactored service, sendFriendRequest takes friendUsername/Email.
-            // We need the username from the search result object.
-            // UI Hack: we can't easily pass object to onclick string.
-            // Let's refactor the render loop above to use data-username attribute.
+                } catch (e) { results.innerHTML = 'Error searching.'; }
+            };
 
-            alert("Please use the main add button or type exact username.");
-            // Actually, the service supports exact match.
-        };
+            btn.onclick = doSearch;
+            input.onkeypress = (e) => { if (e.key === 'Enter') doSearch(); };
+        }
 
-        // Refined Send Request
-        // We will attach listeners properly in a real app, but for this MVP structure:
-        searchList.addEventListener('click', async (e) => {
-            if (e.target.tagName === 'BUTTON') {
-                const uid = e.target.getAttribute('onclick').match(/'([^']+)'/)[1]; // Extract UID (legacy way but works for this setup)
-                // Actually let's just use the username displayed
-                const card = e.target.closest('.glass-panel');
-                const username = card.querySelector('div[style*="color:#666"]').innerText.replace('@', '');
-
-                e.target.innerText = "...";
-                e.target.disabled = true;
-
-                try {
-                    await firestoreService.sendFriendRequest(user.uid, username);
-                    window.showToast("Request Sent!", "📨");
-                    e.target.innerText = "Sent";
-                } catch (err) {
-                    alert(err.message);
-                    e.target.innerText = "Add";
-                    e.target.disabled = false;
-                }
-                e.stopPropagation();
-            }
-        });
-
-        refreshAll();
+        async function visitFriend(friendUid) {
+            // Quick router switch hack for MVP
+            const app = document.getElementById('app');
+            app.innerHTML = await FriendWishlistView.render(friendUid);
+            await FriendWishlistView.afterRender(friendUid);
+        }
     }
 };

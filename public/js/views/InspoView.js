@@ -65,20 +65,10 @@ export const InspoView = {
             window.showToast(i18n.t('common.success'), "✨");
         });
 
-        // --- Helpers ---
-        const showModal = (el) => {
-            if (!el) return;
-            el.style.display = 'flex';
-            void el.offsetWidth;
-            el.classList.add('active');
-        };
-        const hideModal = (el) => {
-            if (!el) return;
-            el.classList.remove('active');
-            setTimeout(() => el.style.display = 'none', 300);
-        };
+        const showModal = (el) => { if (el) { el.style.display = 'flex'; void el.offsetWidth; el.classList.add('active'); } };
+        const hideModal = (el) => { if (el) { el.classList.remove('active'); setTimeout(() => el.style.display = 'none', 300); } };
 
-        // --- BOARD OVERVIEW MODE ---
+        // --- BOARD OVERVIEW ---
         if (!activeBoard) {
             const container = document.getElementById('boards-container');
             const createModal = document.getElementById('create-board-modal');
@@ -86,10 +76,7 @@ export const InspoView = {
             const createTrigger = document.getElementById('btn-create-board-trigger');
 
             if (createTrigger) createTrigger.onclick = () => showModal(createModal);
-
-            document.querySelectorAll('.close-create-board').forEach(b => {
-                b.onclick = () => hideModal(createModal);
-            });
+            document.querySelectorAll('.close-create-board').forEach(b => b.onclick = () => hideModal(createModal));
 
             if (createForm) {
                 createForm.onsubmit = async (e) => {
@@ -104,41 +91,50 @@ export const InspoView = {
                 };
             }
 
-            // Load Boards
             try {
-                const boards = await firestoreService.getBoards(user.uid);
-
-                // Preserve the Create Card, append boards
+                // Pass user.uid to see own private boards
+                const boards = await firestoreService.getBoards(user.uid, user.uid);
+                
                 const createCardHTML = createTrigger ? createTrigger.outerHTML : '';
 
-                const boardCardsHTML = boards.map(board => `
-                    <div class="glass-panel board-card" data-id="${board.id}">
-                        <div class="board-cover" style="height:140px; background-image:url('${board.coverUrl}'); background-size:cover; background-position:center; background-color:#eee;"></div>
-                        <div class="board-info" style="padding:16px;">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
-                                <h3 style="margin:0; font-size:1.1rem;">${board.title}</h3>
-                                <span style="font-size:0.9rem;">
-                                    ${board.privacy === 'private' ? '🔒' : (board.privacy === 'friends' ? '👥' : '🌍')}
-                                </span>
+                const boardCardsHTML = boards.map(board => {
+                    const previews = board.previewImages || [];
+                    if (previews.length === 0 && board.coverUrl) previews.push(board.coverUrl);
+                    
+                    let previewHTML = '';
+                    if (previews.length === 0) {
+                        previewHTML = `<div class="board-cover-placeholder"></div>`;
+                    } else if (previews.length === 1) {
+                        previewHTML = `<div class="board-cover" style="background-image:url('${previews[0]}');"></div>`;
+                    } else {
+                        const imgs = previews.slice(0, 4).map(url => `<div style="background-image:url('${url}');"></div>`).join('');
+                        previewHTML = `<div class="board-preview-grid count-${previews.length}">${imgs}</div>`;
+                    }
+
+                    return `
+                        <div class="glass-panel board-card" data-id="${board.id}">
+                            ${previewHTML}
+                            <div class="board-info">
+                                <div style="display:flex; justify-content:space-between; align-items:center;">
+                                    <h3 style="margin:0; font-size:1.1rem;">${board.title}</h3>
+                                    <span style="font-size:0.9rem;">
+                                        ${board.privacy === 'private' ? '🔒' : (board.privacy === 'friends' ? '👥' : '🌍')}
+                                    </span>
+                                </div>
+                                <p style="margin:4px 0 0; font-size:0.8rem; color:var(--text-tertiary);">${board.pinCount || 0} pins</p>
                             </div>
-                            <p style="margin:4px 0 0; font-size:0.8rem; color:var(--text-tertiary);">${board.pinCount || 0} pins</p>
                         </div>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 container.innerHTML = createCardHTML + boardCardsHTML;
 
-                // Re-bind Create Trigger (since innerHTML replaced it)
                 document.getElementById('btn-create-board-trigger').onclick = () => showModal(createModal);
 
-                // Bind Board Clicks - [FIXED SELECTOR LOGIC]
                 container.querySelectorAll('.board-card:not(.create-card)').forEach(card => {
                     card.onclick = () => {
                         const board = boards.find(b => b.id === card.dataset.id);
-                        if (board) {
-                            activeBoard = board;
-                            InspoView.refresh();
-                        }
+                        if (board) { activeBoard = board; InspoView.refresh(); }
                     };
                 });
 
@@ -146,12 +142,10 @@ export const InspoView = {
             return;
         }
 
-        // --- BOARD DETAIL MODE ---
+        // --- BOARD DETAIL ---
         const backBtn = document.getElementById('btn-back-boards');
         const settingsBtn = document.getElementById('btn-board-settings');
-        const fabAdd = document.getElementById('fab-add-pin');
         const aiBtn = document.getElementById('btn-ai-vibe');
-
         const settingsModal = document.getElementById('board-settings-modal');
         const addPinModal = document.getElementById('add-pin-modal');
         const aiContainer = document.getElementById('ai-suggestions-container');
@@ -165,16 +159,13 @@ export const InspoView = {
             showModal(settingsModal);
         };
 
+        // Open Add Modal Function
         const openAddModal = () => {
             showModal(addPinModal);
-            const grid = document.getElementById('pin-selection-grid');
-            if (grid && !grid.hasChildNodes()) {
-                grid.innerHTML = `<div class="loading-spinner">${i18n.t('common.loading')}</div>`;
-            }
+            renderPinSource('wishlist');
         };
 
-        if (fabAdd) fabAdd.onclick = openAddModal;
-
+        // Load Data
         let pins = [], wishlist = [], closet = [];
         try {
             [pins, wishlist, closet] = await Promise.all([
@@ -185,26 +176,72 @@ export const InspoView = {
         } catch (e) { console.error(e); }
 
         const pinsGrid = document.getElementById('pins-grid');
+        
         if (pinsGrid) {
-            if (pins.length > 0) {
-                pinsGrid.innerHTML = pins.map((pin, idx) => {
-                    const hasLink = !!pin.refId;
-                    const delay = Math.min(idx * 50, 500); // Stagger effect
-                    return `
-                        <div class="glass-panel pin-item stagger-item" style="animation-delay:${delay}ms; margin-bottom:16px; border-radius:16px; overflow:hidden; position:relative;">
-                            <img src="${pin.imageUrl}" style="width:100%; display:block;">
-                            <div class="pin-actions" style="position:absolute; top:8px; right:8px; display:flex; gap:6px;">
-                                ${hasLink ? `<button class="icon-btn btn-view-link" data-id="${pin.refId}" style="background:white; border-radius:50%; width:32px; height:32px; box-shadow:0 2px 8px rgba(0,0,0,0.1);">🔗</button>` : ''}
-                                <button class="icon-btn btn-delete-pin" data-id="${pin.id}" style="background:white; border-radius:50%; width:32px; height:32px; box-shadow:0 2px 8px rgba(0,0,0,0.1); color:#ff3b30;">&times;</button>
-                            </div>
+            // ** 1. "Add Pin" Tile Template **
+            // This tile sits inside the grid as the first item
+            const addTileHTML = `
+                <div class="glass-panel pin-item add-pin-tile" id="tile-add-pin" style="
+                    display:flex; 
+                    flex-direction:column; 
+                    align-items:center; 
+                    justify-content:center; 
+                    aspect-ratio: 1; 
+                    border: 2px dashed rgba(0,0,0,0.1); 
+                    background: rgba(255,255,255,0.4); 
+                    cursor:pointer; 
+                    margin-bottom:16px; 
+                    border-radius:16px;">
+                    <div style="font-size:2.5rem; color:var(--accent-color); margin-bottom:4px;">+</div>
+                    <div style="font-size:0.9rem; font-weight:600; color:var(--text-secondary);">Add Pin</div>
+                </div>
+            `;
+
+            if (pins.length === 0) {
+                // ** Empty State **
+                // Center the message, but maybe still provide the add action clearly
+                pinsGrid.style.display = 'flex';
+                pinsGrid.style.flexDirection = 'column';
+                pinsGrid.style.alignItems = 'center';
+                pinsGrid.style.justifyContent = 'center';
+                pinsGrid.style.minHeight = '50vh';
+                
+                pinsGrid.innerHTML = `
+                    <div style="text-align:center; animation: fadeUp 0.5s ease-out;">
+                        <div style="font-size:4rem; margin-bottom:16px;">🎨</div>
+                        <h3 style="margin-bottom:8px;">Start your vision</h3>
+                        <p style="color:var(--text-secondary); margin-bottom:24px;">This board is waiting for inspiration.</p>
+                        <button class="btn-primary" id="btn-empty-add-main" style="padding:12px 32px;">+ Add First Pin</button>
+                    </div>
+                `;
+                
+                const emptyBtn = document.getElementById('btn-empty-add-main');
+                if(emptyBtn) emptyBtn.onclick = openAddModal;
+
+            } else {
+                // ** Grid State **
+                // Reset grid styles if coming from empty state
+                pinsGrid.style.display = 'block'; 
+                pinsGrid.style.minHeight = 'auto';
+
+                const pinsHTML = pins.map((pin, idx) => `
+                    <div class="glass-panel pin-item stagger-item" style="animation-delay:${Math.min(idx * 50, 500)}ms; margin-bottom:16px; border-radius:16px; overflow:hidden; position:relative;">
+                        <img src="${pin.imageUrl}" style="width:100%; display:block;">
+                        <div class="pin-actions">
+                            ${pin.refId ? `<button class="icon-btn btn-view-link" data-id="${pin.refId}">🔗</button>` : ''}
+                            <button class="icon-btn btn-delete-pin" data-id="${pin.id}">&times;</button>
                         </div>
-                    `;
-                }).join('');
+                    </div>
+                `).join('');
 
-                const style = document.createElement('style');
-                style.innerHTML = `.pin-item:hover .pin-actions { opacity: 1; } .pin-actions { opacity: 0; transition: opacity 0.2s; }`;
-                document.head.appendChild(style);
+                // Prepend the Add Tile
+                pinsGrid.innerHTML = addTileHTML + pinsHTML;
 
+                // Bind Add Tile
+                const addTile = document.getElementById('tile-add-pin');
+                if(addTile) addTile.onclick = openAddModal;
+
+                // Bind Actions
                 pinsGrid.querySelectorAll('.btn-view-link').forEach(btn => {
                     btn.onclick = (e) => {
                         e.stopPropagation();
@@ -222,47 +259,28 @@ export const InspoView = {
                         }
                     };
                 });
-            } else {
-                pinsGrid.innerHTML = `
-                    <div style="grid-column:1/-1; text-align:center; padding:40px; color:var(--text-tertiary);">
-                        <p style="margin-bottom:16px;">This board is empty.</p>
-                        <button class="btn-primary" id="btn-empty-add">+ Add first pin</button>
-                    </div>`;
-                const emptyBtn = document.getElementById('btn-empty-add');
-                if (emptyBtn) emptyBtn.onclick = () => showModal(addPinModal);
             }
         }
 
-        // --- ADD PIN LOGIC ---
-        if (fabAdd) fabAdd.onclick = () => {
-            showModal(addPinModal);
-            renderPinSource('wishlist');
-        };
-
+        // --- ADD PIN MODAL LOGIC ---
         const renderPinSource = (source) => {
             const grid = document.getElementById('pin-selection-grid');
             const urlInput = document.getElementById('pin-url-input-container');
-
             document.querySelectorAll('.pin-tab').forEach(t => t.classList.toggle('active', t.dataset.source === source));
 
             if (source === 'url') {
                 grid.style.display = 'none';
-                // [FIX] Flex alignment
                 urlInput.style.display = 'flex';
             } else {
                 grid.style.display = 'grid';
                 urlInput.style.display = 'none';
-
                 const items = source === 'wishlist' ? wishlist : closet;
                 if (items.length === 0) {
-                    grid.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#999;">No items.</p>`;
+                    grid.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#999;">No items found.</p>`;
                     return;
                 }
-
                 grid.innerHTML = items.map(item => `
-                    <div class="pin-candidate" data-id="${item.id}" data-img="${item.imageUrl}" style="cursor:pointer; border-radius:8px; overflow:hidden; aspect-ratio:1; position:relative;">
-                        <img src="${item.imageUrl}" style="width:100%; height:100%; object-fit:cover;">
-                    </div>
+                    <div class="pin-candidate" data-id="${item.id}" data-img="${item.imageUrl}" style="background-image:url('${item.imageUrl}');"></div>
                 `).join('');
 
                 grid.querySelectorAll('.pin-candidate').forEach(el => {
@@ -275,9 +293,7 @@ export const InspoView = {
             }
         };
 
-        document.querySelectorAll('.pin-tab').forEach(tab => {
-            tab.onclick = () => renderPinSource(tab.dataset.source);
-        });
+        document.querySelectorAll('.pin-tab').forEach(tab => tab.onclick = () => renderPinSource(tab.dataset.source));
 
         const btnAddUrl = document.getElementById('btn-add-pin-url');
         if (btnAddUrl) {
@@ -291,7 +307,6 @@ export const InspoView = {
             };
         }
 
-        // --- SETTINGS ---
         const settingsForm = document.getElementById('edit-board-form');
         if (settingsForm) {
             settingsForm.onsubmit = async (e) => {
@@ -302,7 +317,8 @@ export const InspoView = {
                     privacy: document.getElementById('board-privacy-input').value
                 });
                 hideModal(settingsModal);
-                const updated = await firestoreService.getBoards(user.uid);
+                
+                const updated = await firestoreService.getBoards(user.uid, user.uid);
                 activeBoard = updated.find(b => b.id === activeBoard.id);
                 InspoView.refresh();
             };
@@ -333,9 +349,7 @@ export const InspoView = {
             };
         }
 
-        document.querySelectorAll('.close-btn').forEach(btn => {
-            btn.onclick = (e) => hideModal(e.target.closest('.modal-overlay'));
-        });
+        document.querySelectorAll('.close-btn').forEach(btn => btn.onclick = (e) => hideModal(e.target.closest('.modal-overlay')));
     },
 
     refresh: async () => {
@@ -346,7 +360,19 @@ export const InspoView = {
 
     renderBoardDetail: (board) => {
         return `
-            <div class="view-header" style="display:flex; justify-content:space-between; align-items:center;">
+            <div class="view-header" style="
+                position: sticky; 
+                top: 0px; 
+                z-index: 100; 
+                background: rgba(255,255,255,0.9); 
+                backdrop-filter: blur(10px); 
+                margin: -20px -20px 24px -20px; 
+                padding: 20px 20px;
+                border-bottom: 1px solid rgba(0,0,0,0.05);
+                display:flex; 
+                justify-content:space-between; 
+                align-items:center;">
+                
                 <div style="display:flex; align-items:center; gap:12px;">
                     <button class="btn-text" id="btn-back-boards" style="font-size:1.2rem;">←</button>
                     <div>
@@ -365,8 +391,6 @@ export const InspoView = {
             <div id="pins-grid" class="masonry-grid inspo-masonry">
                 <div class="loading-spinner">Loading pins...</div>
             </div>
-
-            <button class="fab-add" id="fab-add-pin" style="z-index:900;">+</button>
 
             <div id="board-settings-modal" class="modal-overlay" style="z-index: 1100;">
                 <div class="modal-content">

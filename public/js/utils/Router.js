@@ -1,12 +1,23 @@
+/* public/js/utils/Router.js */
 export class Router {
-    constructor(routes) {
+    constructor(routes = {}) {
         this.routes = routes;
         this.guard = null;
+        // Bind the event listener once
         window.addEventListener('hashchange', () => this.handleLocation());
+        window.addEventListener('load', () => this.handleLocation());
+    }
+
+    setRoutes(routes) {
+        this.routes = routes;
     }
 
     setGuard(guardFn) {
         this.guard = guardFn;
+    }
+
+    navigate(path) {
+        window.location.hash = path;
     }
 
     async handleLocation() {
@@ -27,14 +38,13 @@ export class Router {
         // 2. Match Route
         let route = this.routes[path];
 
-        // Handle Dynamic Routes / Shell Children logic if exact match fails
+        // Handle 404
         if (!route) {
-            // Simple logic: if not exact, try 404. 
-            // (Complex params logic omitted for MVP stability)
             route = this.routes['404'];
         }
 
         const app = document.getElementById('app');
+        if (!app || !route) return;
 
         // 3. Render
         try {
@@ -51,3 +61,6 @@ export class Router {
         }
     }
 }
+
+// Export a singleton instance to be used across the app
+export const router = new Router();

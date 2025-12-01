@@ -259,3 +259,106 @@ body.mode-love::after {
         font-size: 0.8rem;
     }
 }
+
+/* --- App Shell Structure (Desktop First) --- */
+.app-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+.app-topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.topbar-nav {
+    display: flex;
+    gap: 20px;
+}
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.app-content {
+    flex-grow: 1;
+    padding: 20px;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    /* Account for topbar/bottombar padding */
+    padding-bottom: 80px; 
+}
+
+/* Mobile Tab Bar (Hidden by default) */
+.mobile-tabbar {
+    display: none; 
+}
+.desktop-only { display: flex; }
+.mobile-only { display: none; }
+
+/* --- Responsiveness (Mobile View) --- */
+@media (max-width: 768px) {
+    .app-topbar {
+        padding: 10px 15px;
+    }
+
+    .topbar-nav.desktop-only,
+    .topbar-right {
+        display: none; /* Hide desktop nav and extra icons on mobile */
+    }
+
+    .app-content {
+        padding: 15px 15px 70px 15px; /* Adjust padding for mobile shell */
+    }
+
+    /* Show Mobile Tab Bar */
+    .mobile-tabbar {
+        display: flex;
+        justify-content: space-around;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+        z-index: 1100;
+    }
+
+    .mobile-tabbar .nav-item {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-decoration: none;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        transition: color 0.2s;
+        padding: 4px;
+    }
+
+    .mobile-tabbar .nav-item .icon {
+        font-size: 1.2rem;
+    }
+
+    .mobile-tabbar .nav-item.active {
+        color: var(--accent-color);
+        font-weight: 600;
+    }
+    
+    .desktop-only { display: none; }
+    .mobile-only { display: flex; }
+}
