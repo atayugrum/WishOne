@@ -1,7 +1,6 @@
 /* public/js/views/HomeView.js */
 import { authService } from '../services/AuthService.js';
 import { firestoreService } from '../services/FirestoreService.js';
-import { i18n } from '../services/LocalizationService.js';
 import { AddItemModal } from '../components/addItemModal.js';
 
 let addItemModal = null;
@@ -11,66 +10,71 @@ export const HomeView = {
         const user = authService.currentUser;
         if (!user) return '';
 
+        // [FIX] Removed local <div class="lab-gradient-bg"> to prevent double background layers.
+        // The gradient is now handled globally in AppShell.
+
         return `
-            <div class="home-view fade-in">
-                <div class="home-hero">
+            <div class="home-container fade-in">
+                
+                <div class="home-header">
                     <div>
-                        <h1 id="home-welcome">Hi, User 👋</h1>
-                        <p class="subtitle">${i18n.t('home.subtitle')}</p>
+                        <h1 id="home-greeting" class="hero-title">Welcome Back</h1>
+                        <p id="home-subline">Let's align your goals today.</p>
                     </div>
-                    <button id="btn-quick-add" class="btn-primary btn-glow">+ ${i18n.t('home.addBtn')}</button>
-                </div>
-
-                <div class="glass-panel financial-card" style="margin-bottom: 24px; padding: 20px; background: linear-gradient(135deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4));">
-                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    
+                    <div class="glass-panel ai-insight-badge" style="padding:10px 20px; border-radius:100px; display:flex; gap:12px; align-items:center;">
+                        <span style="font-size:1.2rem;">🔮</span>
                         <div>
-                            <div style="font-size:0.8rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Weekly Goal</div>
-                            <div id="home-weekly-savings" style="font-size:1.8rem; font-weight:800; color:var(--accent-color);">...</div>
-                        </div>
-                        <div style="text-align:right;">
-                            <div style="font-size:0.8rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:1px;">Total Value</div>
-                            <div id="home-total-value" style="font-size:1.2rem; font-weight:600;">...</div>
-                        </div>
-                    </div>
-                    <div style="margin-top:12px; font-size:0.9rem; color:var(--text-tertiary);">
-                        To reach all your target dates, save this amount per week.
-                    </div>
-                </div>
-
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:16px; margin-bottom:24px;">
-                    <div class="glass-panel" style="padding:16px; display:flex; align-items:center; gap:12px;">
-                        <span style="font-size:2rem;">✨</span>
-                        <div>
-                            <div id="stat-wishes" style="font-weight:700; font-size:1.2rem;">-</div>
-                            <div style="font-size:0.8rem; color:var(--text-secondary);">Active Wishes</div>
-                        </div>
-                    </div>
-                    <div class="glass-panel" style="padding:16px; display:flex; align-items:center; gap:12px;">
-                        <span style="font-size:2rem;">🧥</span>
-                        <div>
-                            <div id="stat-closet" style="font-weight:700; font-size:1.2rem;">-</div>
-                            <div style="font-size:0.8rem; color:var(--text-secondary);">In Closet</div>
+                            <div style="font-size:0.7rem; text-transform:uppercase; color:var(--accent-color); font-weight:700; letter-spacing:1px;">Daily Vibe</div>
+                            <div style="font-size:0.85rem; font-weight:500; color:var(--text-primary);">"Focus on quality."</div>
                         </div>
                     </div>
                 </div>
 
-                <h3 style="margin-bottom:12px;">📅 Upcoming Goals</h3>
-                <div id="home-upcoming-list" class="scroll-row" style="display:flex; gap:12px; overflow-x:auto; padding-bottom:20px; min-height:100px;">
-                    <div class="loading-spinner"></div>
-                </div>
-
-                <div style="margin-top:12px;">
-                    <div class="glass-panel" onclick="window.location.hash='#/app/inspo'" style="padding:16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
-                        <div style="display:flex; align-items:center; gap:12px;">
-                            <span style="font-size:1.5rem;">🎨</span>
-                            <div>
-                                <div style="font-weight:600;">Inspo Boards</div>
-                                <div style="font-size:0.8rem; color:var(--text-secondary);">Continue visualizing</div>
-                            </div>
-                        </div>
-                        <span>→</span>
+                <div class="stats-row">
+                    <div class="glass-panel stat-card">
+                        <div class="stat-value" id="stat-total-wishes">-</div>
+                        <div class="stat-label">Active</div>
+                    </div>
+                    <div class="glass-panel stat-card">
+                        <div class="stat-value" id="stat-total-value">-</div>
+                        <div class="stat-label">Value</div>
+                    </div>
+                    <div class="glass-panel stat-card" style="background: rgba(255, 255, 255, 0.8);">
+                        <div class="stat-value">✨</div>
+                        <div class="stat-label">Manifest</div>
                     </div>
                 </div>
+
+                <div id="wishlist-preview-section" style="margin-bottom: 40px;">
+                    <div class="loading-spinner">Loading your universe...</div>
+                </div>
+
+                <h3 style="margin-bottom:16px; font-size:1rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-tertiary); padding-left:4px;">Quick Actions</h3>
+                <div class="quick-actions-grid">
+                    
+                    <button id="qa-add" class="glass-panel action-card primary-action">
+                        <span class="action-icon">+</span>
+                        <span class="action-label">Add Wish</span>
+                    </button>
+
+                    <button id="qa-planner" class="glass-panel action-card">
+                        <span class="action-icon">🎯</span>
+                        <span class="action-label">AI Planner</span>
+                    </button>
+
+                    <button id="qa-inspo" class="glass-panel action-card">
+                        <span class="action-icon">🎨</span>
+                        <span class="action-label">Moodboard</span>
+                    </button>
+
+                    <button id="qa-magic" class="glass-panel action-card">
+                        <span class="action-icon">🧠</span>
+                        <span class="action-label">Magic Add</span>
+                    </button>
+
+                </div>
+
             </div>
         `;
     },
@@ -79,70 +83,74 @@ export const HomeView = {
         const user = authService.currentUser;
         if (!user) return;
 
-        if (!addItemModal) addItemModal = new AddItemModal(() => HomeView.afterRender());
-        
-        document.getElementById('btn-quick-add').onclick = () => addItemModal.open();
+        if (!addItemModal) addItemModal = new AddItemModal(() => HomeView.refresh());
+
+        // Bind Actions
+        document.getElementById('qa-add').onclick = () => addItemModal.open();
+        document.getElementById('qa-magic').onclick = () => addItemModal.open();
+        document.getElementById('qa-planner').onclick = () => { window.location.hash = '#/app/wishlist'; };
+        document.getElementById('qa-inspo').onclick = () => { window.location.hash = '#/app/inspo'; };
 
         try {
-            // Load Profile for Name
+            // 1. Profile Data
             const profile = await firestoreService.getUserProfile(user.uid);
-            document.getElementById('home-welcome').innerText = `Hi, ${profile?.displayName?.split(' ')[0] || 'Dreamer'} 👋`;
-
-            // Load Items for Stats & Financials
-            const items = await firestoreService.getWishlist(user.uid, user.uid); // Active & Bought (mostly)
+            const nameEl = document.getElementById('home-greeting');
+            const subEl = document.getElementById('home-subline');
             
-            // Stats
-            const activeWishes = items.filter(i => i.status === 'wish' && !i.deleted);
-            const boughtItems = await firestoreService.getCloset(user.uid);
-            
-            document.getElementById('stat-wishes').innerText = activeWishes.length;
-            document.getElementById('stat-closet').innerText = boughtItems.length;
-
-            // Financials
-            let totalValue = 0;
-            let weeklySum = 0;
-            
-            activeWishes.forEach(i => {
-                totalValue += (i.price || 0);
-                if (i.targetDate) {
-                    const today = new Date();
-                    const target = new Date(i.targetDate);
-                    if (target > today) {
-                        const weeks = Math.max(1, Math.ceil((target - today) / (1000 * 60 * 60 * 24 * 7)));
-                        weeklySum += (i.price / weeks);
-                    }
-                }
-            });
-
-            document.getElementById('home-total-value').innerText = `${totalValue.toLocaleString()} TRY`; // Simplified currency
-            document.getElementById('home-weekly-savings').innerText = `${Math.ceil(weeklySum).toLocaleString()} TRY`;
-
-            // Upcoming
-            const upcoming = activeWishes
-                .filter(i => i.targetDate)
-                .sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate))
-                .slice(0, 5);
-
-            const upcomingContainer = document.getElementById('home-upcoming-list');
-            if (upcoming.length === 0) {
-                upcomingContainer.innerHTML = `<div style="color:var(--text-tertiary); font-size:0.9rem;">No upcoming target dates. Add one!</div>`;
-            } else {
-                upcomingContainer.innerHTML = upcoming.map(i => {
-                    const date = new Date(i.targetDate);
-                    const day = date.getDate();
-                    const month = date.toLocaleString('default', { month: 'short' });
-                    return `
-                        <div class="glass-panel" style="min-width:140px; padding:12px; display:flex; flex-direction:column; gap:8px;">
-                            <div style="font-size:0.8rem; color:var(--accent-color); font-weight:700;">${day} ${month}</div>
-                            <div style="font-weight:600; font-size:0.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i.title}</div>
-                            <div style="font-size:0.8rem; color:var(--text-secondary);">${i.price} ${i.currency}</div>
-                        </div>
-                    `;
-                }).join('');
+            if (profile?.displayName) {
+                const name = profile.displayName.split(' ')[0];
+                nameEl.innerText = `Hi, ${name} 👋`;
             }
 
-        } catch (e) {
-            console.error(e);
-        }
+            // 2. Wishlist Data
+            const items = await firestoreService.getWishlist(user.uid, user.uid);
+            const activeWishes = items.filter(i => i.status === 'wish' && !i.deleted);
+            
+            // Stats
+            document.getElementById('stat-total-wishes').innerText = activeWishes.length;
+            const totalVal = activeWishes.reduce((acc, curr) => acc + (curr.price || 0), 0);
+            document.getElementById('stat-total-value').innerText = totalVal.toLocaleString();
+
+            // 3. Render Preview
+            const container = document.getElementById('wishlist-preview-section');
+            
+            if (activeWishes.length === 0) {
+                subEl.innerText = "Your canvas is empty. Let's create.";
+                container.innerHTML = `
+                    <div class="glass-panel empty-home-card" style="text-align:center; padding: 40px; border:1px dashed rgba(0,0,0,0.1);">
+                        <div style="font-size:3rem; margin-bottom:12px; opacity:0.8;">✨</div>
+                        <h3 style="margin-bottom:8px;">Start Your Wishlist</h3>
+                        <p style="color:var(--text-secondary); margin-bottom:24px;">Add your first item to unlock AI insights.</p>
+                        <button class="btn-primary" onclick="document.getElementById('qa-add').click()">Add First Wish</button>
+                    </div>
+                `;
+            } else {
+                const recent = activeWishes.slice(0, 3);
+                const listHtml = recent.map(item => `
+                    <div class="glass-panel preview-item" style="display:flex; align-items:center; gap:16px; padding:12px; margin-bottom:12px;">
+                        <img src="${item.imageUrl}" style="width:50px; height:50px; border-radius:12px; object-fit:cover;">
+                        <div style="flex:1;">
+                            <div style="font-weight:600; color:var(--text-primary);">${item.title}</div>
+                            <div style="font-size:0.85rem; color:var(--text-secondary);">${item.price} ${item.currency}</div>
+                        </div>
+                    </div>
+                `).join('');
+
+                container.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 4px;">
+                        <h3 style="font-size:1rem; text-transform:uppercase; letter-spacing:1px; color:var(--text-tertiary); margin:0;">Top Wishes</h3>
+                        <a href="#/app/wishlist" style="color:var(--accent-color); text-decoration:none; font-weight:600; font-size:0.9rem;">View All →</a>
+                    </div>
+                    ${listHtml}
+                `;
+            }
+
+        } catch (e) { console.error(e); }
+    },
+
+    refresh: async () => {
+        const app = document.getElementById('shell-content');
+        app.innerHTML = await HomeView.render();
+        await HomeView.afterRender();
     }
 };

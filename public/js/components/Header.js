@@ -1,5 +1,5 @@
+/* public/js/components/Header.js */
 import { authService } from '../services/AuthService.js';
-import { i18n } from '../services/LocalizationService.js';
 
 export class Header {
     constructor() {
@@ -14,80 +14,65 @@ export class Header {
     render() {
         const user = authService.currentUser;
         const profile = authService.userProfile;
-
-        // [FIX] Add safe check for user before accessing properties
-        const userInitial = (user && user.displayName) ? user.displayName.charAt(0).toUpperCase() : '?';
         const photoURL = (profile && profile.photoURL) ? profile.photoURL : 'https://placehold.co/100';
 
+        // 3-Column Layout: Logo | Nav Links | Profile/Settings
         const html = `
-            <header class="floating-header">
+            <header class="app-topbar">
+                
                 <div class="header-left">
-                    <img src="img/logo.png" alt="WishOne" class="brand-logo-small">
+                    <a href="#/app/home" class="brand-link">
+                        <img src="img/logo.png" alt="WishOne" class="brand-logo">
+                        <span class="brand-text">WishOne</span>
+                    </a>
                 </div>
                 
-                <nav class="header-nav">
-                    <div class="nav-pills">
-                        <a href="#/" class="nav-link" data-link>${i18n.t('nav.home')}</a>
-                        <a href="#/inspo" class="nav-link" data-link>${i18n.t('nav.inspo')}</a>
-                        <a href="#/closet" class="nav-link" data-link>${i18n.t('nav.closet')}</a>
-                        <a href="#/combos" class="nav-link" data-link>${i18n.t('nav.combos')}</a>
-                        <a href="#/friends" class="nav-link" data-link>${i18n.t('nav.friends')}</a>
-                    </div>
+                <nav class="header-center desktop-only">
+                    <a href="#/app/home" class="nav-link" data-path="/app/home">Home</a>
+                    <a href="#/app/wishlist" class="nav-link" data-path="/app/wishlist">Wishlist</a>
+                    <a href="#/app/closet" class="nav-link" data-path="/app/closet">Closet</a>
+                    <a href="#/app/inspo" class="nav-link" data-path="/app/inspo">Inspo</a>
+                    <a href="#/app/friends" class="nav-link" data-path="/app/friends">Friends</a>
                 </nav>
 
-                <div class="header-actions">
+                <div class="header-right">
                     ${user ? `
-                        <div class="user-avatar" onclick="window.location.hash='#/profile'">
-                            ${profile && profile.photoURL ?
-                    `<img src="${photoURL}" alt="Profile">` :
-                    `<div style="width:100%; height:100%; background:var(--accent-color); color:white; display:flex; align-items:center; justify-content:center; font-weight:700;">${userInitial}</div>`
-                }
+                        <button class="icon-btn" onclick="window.location.hash='#/app/settings'" title="Settings">
+                            ⚙️
+                        </button>
+                        <div class="user-avatar-small" onclick="window.location.hash='#/app/profile'">
+                            <img src="${photoURL}" alt="Profile">
                         </div>
-                        <button class="icon-btn" onclick="window.location.hash='#/settings'" title="${i18n.t('nav.settings')}">⚙️</button>
                     ` : `
-                        <a href="#/welcome" class="nav-link">Login</a>
+                        <a href="#/auth" class="nav-link">Log In</a>
                     `}
                 </div>
             </header>
         `;
 
         if (this.element) {
-            // Check if header already exists to avoid dupes
-            const existing = document.querySelector('.floating-header');
-            if (existing) existing.remove();
-
-            // Insert at top of body
-            document.body.insertAdjacentHTML('afterbegin', html);
-
-            // Bind Logic
+            this.element.innerHTML = html;
             this.bindEvents();
         }
     }
 
     bindEvents() {
-        // Active Link Logic
+        // Highlight active link based on current hash
         const updateActive = () => {
-            const hash = window.location.hash || '#/';
-            document.querySelectorAll('.nav-link').forEach(link => {
-                if (link.getAttribute('href') === hash) link.classList.add('active');
-                else link.classList.remove('active');
+            const hash = window.location.hash || '#/app/home';
+            // Simple check: does the hash contain the data-path?
+            const links = this.element.querySelectorAll('.nav-link');
+            links.forEach(link => {
+                const path = link.dataset.path;
+                if (path && hash.includes(path)) {
+                    link.classList.add('active');
+                } else {
+                    link.classList.remove('active');
+                }
             });
         };
+
         window.addEventListener('hashchange', updateActive);
-        updateActive();
-    }
-
-    updateUser(user) {
-        this.render();
-    }
-
-    hide() {
-        const el = document.querySelector('.floating-header');
-        if (el) el.style.display = 'none';
-    }
-
-    show() {
-        const el = document.querySelector('.floating-header');
-        if (el) el.style.display = 'flex';
+        updateActive(); // Initial run
     }
 }

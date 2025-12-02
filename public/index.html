@@ -1,195 +1,64 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WishOne - by AtOne</title>
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/variables.css">
+    <title>WishOne - Coming Soon</title>
     <link rel="icon" type="image/png" href="img/icon.png">
-    <style>
-        body {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            text-align: center;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            overflow: hidden;
-        }
-
-        .landing-card {
-            background: rgba(255, 255, 255, 0.6);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            padding: 60px 40px;
-            border-radius: 32px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
-            max-width: 500px;
-            width: 90%;
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            animation: fadeUp 1s ease;
-        }
-
-        h1 {
-            font-size: 3rem;
-            margin: 0;
-            background: linear-gradient(45deg, #111, #555);
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .subtitle {
-            font-size: 1.1rem;
-            color: #666;
-            margin-top: 8px;
-            font-weight: 500;
-        }
-
-        .tagline {
-            margin: 32px 0;
-            font-size: 1.4rem;
-            line-height: 1.5;
-            color: #333;
-        }
-
-        .countdown {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            margin: 32px 0;
-        }
-
-        .count-box {
-            background: rgba(255, 255, 255, 0.8);
-            padding: 12px;
-            border-radius: 12px;
-            min-width: 60px;
-        }
-
-        .count-num {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent-color, #007AFF);
-        }
-
-        .count-label {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            color: #888;
-        }
-
-        .beta-badge {
-            background: #000;
-            color: #fff;
-            padding: 4px 12px;
-            border-radius: 100px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .notify-form {
-            display: flex;
-            gap: 8px;
-            margin-top: 24px;
-        }
-
-        .notify-input {
-            flex: 1;
-            padding: 12px 16px;
-            border-radius: 12px;
-            border: 1px solid rgba(0, 0, 0, 0.1);
-            outline: none;
-            transition: 0.3s;
-        }
-
-        .notify-input:focus {
-            border-color: #007AFF;
-            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
-        }
-
-        .notify-btn {
-            padding: 12px 24px;
-            background: #000;
-            color: #fff;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: 0.2s;
-        }
-
-        .notify-btn:hover {
-            transform: scale(1.02);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Secret access for devs */
-        .secret-access {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 20px;
-            height: 20px;
-            opacity: 0;
-            cursor: default;
-        }
-
-        @keyframes fadeUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-    </style>
+    
+    <link rel="stylesheet" href="css/variables.css">
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
 </head>
-
 <body>
 
-    <div class="landing-card">
-        <span class="beta-badge">Private Beta</span>
-        <div style="margin-top: 24px;">
-            <img src="img/icon.png" width="80" height="80" alt="WishOne Logo"
-                style="filter: drop-shadow(0 10px 20px rgba(0,0,0,0.15));">
+    <div class="lab-gradient-bg"></div>
+
+    <div class="hub-view-container">
+        <div class="hub-hero-card">
+            
+            <img src="img/icon.png" alt="WishOne" class="hub-logo">
+            
+            <h1 class="hub-title">WishOne</h1>
+            <p class="hub-subtitle">
+                Curate your life. Manifest your dreams.<br>
+                The lab opens soon.
+            </p>
+
+            <div id="action-area">
+                <div id="countdown-container" class="countdown-grid">
+                    <div class="count-box">
+                        <span class="count-val" id="count-days">00</span>
+                        <span class="count-label">Days</span>
+                    </div>
+                    <div class="count-box">
+                        <span class="count-val" id="count-hours">00</span>
+                        <span class="count-label">Hrs</span>
+                    </div>
+                    <div class="count-box">
+                        <span class="count-val" id="count-minutes">00</span>
+                        <span class="count-label">Min</span>
+                    </div>
+                    <div class="count-box">
+                        <span class="count-val" id="count-seconds">00</span>
+                        <span class="count-label">Sec</span>
+                    </div>
+                </div>
+                
+                <p style="font-size:0.85rem; color:var(--text-tertiary);">
+                    Friday, 12:00 PM (Istanbul)
+                </p>
+            </div>
+
         </div>
-        <h1>WishOne</h1>
-        <p class="subtitle">by AtOne</p>
-
-        <p class="tagline">Curate your life.<br>Manifest your dreams.</p>
-
-        <div class="countdown">
-            <div class="count-box">
-                <div class="count-num">04</div>
-                <div class="count-label">Days</div>
-            </div>
-            <div class="count-box">
-                <div class="count-num">12</div>
-                <div class="count-label">Hours</div>
-            </div>
-            <div class="count-box">
-                <div class="count-num">30</div>
-                <div class="count-label">Mins</div>
-            </div>
-        </div>
-
-        <form class="notify-form" onsubmit="event.preventDefault(); alert('You are on the list! 💌');">
-            <input type="email" class="notify-input" placeholder="Enter your email" required>
-            <button type="submit" class="notify-btn">Notify Me</button>
-        </form>
-
-        <p style="margin-top: 32px; font-size: 0.85rem; color: #999;">Invites are rolling out slowly.</p>
+        
+        <p style="margin-top:24px; font-size:0.75rem; color:var(--text-tertiary); opacity:0.6;">
+            &copy; 2025 AtOne Ecosystem.
+        </p>
     </div>
 
-    <a href="/lab" class="secret-access" title="Lab Access"></a>
+    <a href="/lab" style="position:fixed; bottom:20px; right:20px; opacity:0.2; color:#000; text-decoration:none; font-size:0.8rem;">Enter Lab →</a>
 
+    <script src="js/landing.js"></script>
 </body>
-
 </html>

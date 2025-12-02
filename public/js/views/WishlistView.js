@@ -2,656 +2,184 @@
 import { firestoreService } from '../services/FirestoreService.js';
 import { authService } from '../services/AuthService.js';
 import { AddItemModal } from '../components/addItemModal.js';
-import { CATEGORIES } from '../config/categories.js';
 import { i18n } from '../services/LocalizationService.js';
-import { GamificationService } from '../services/GamificationService.js';
-import { aiService } from '../services/AIService.js';
 
 let addItemModal = null;
 let itemsMap = new Map();
-let currentFilters = {
-    saleOnly: false,
-    category: 'All',
-    occasion: 'All',
-    priceRange: 'All', // New
-    status: 'wish',
-    search: '',
-    viewMode: 'grid',
-    sortOrder: 'newest'
+
+// Local state for filters
+let currentFilter = {
+    occasion: 'All', // 'All', 'Main', or specific string
 };
 
-// --- HELPERS ---
-function getCountdown(dateString) {
-    if (!dateString) return null;
-    const target = new Date(dateString);
-    if (isNaN(target.getTime())) return null;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    target.setHours(0, 0, 0, 0);
-    const diffTime = target - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    if (diffDays < 0) return { text: i18n.t('time.overdue'), class: "tag-overdue" };
-    if (diffDays === 0) return { text: i18n.t('time.today'), class: "tag-urgent" };
-    if (diffDays <= 7) return { text: `${diffDays} ${i18n.t('time.days_left')}`, class: "tag-urgent" };
-    if (diffDays <= 30) return { text: `${diffDays} ${i18n.t('time.days_left')}`, class: "tag-soon" };
-    const months = Math.round(diffDays / 30);
-    if (months <= 1) return { text: i18n.t('time.next_month'), class: "tag-far" };
-    if (months >= 12) return { text: `in ${(months / 12).toFixed(1)} ${i18n.t('time.years')}`, class: "tag-far" };
-    return { text: `in ${months} ${i18n.t('time.months')}`, class: "tag-far" };
-}
-
-function getSavingInsight(price, targetDate) {
-    if (!price || price <= 0 || !targetDate) return null;
-    const target = new Date(targetDate);
-    const today = new Date();
-    if (target <= today) return null;
-    const diffTime = target - today;
-    const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7));
-    const weeks = Math.max(1, diffWeeks);
-    const weeklySaving = Math.ceil(price / weeks);
-    return { weeks, weeklySaving };
-}
-
 export const WishlistView = {
-    skeletonTemplate: `
-        <article class="glass-panel card skeleton-card">
-            <div class="skeleton-img"></div>
-            <div class="skeleton-text title"></div>
-            <div class="skeleton-text meta"></div>
-        </article>
-    `,
-
     render: async () => {
-        const cats = ['All', ...Object.keys(CATEGORIES)];
-        const catOptions = cats.map(c => `<option value="${c}">${c}</option>`).join('');
-        const occasions = ['All', 'Birthday', 'New Year', 'Anniversary', 'Self-care', 'Custom'];
-        const occOptions = occasions.map(o => `<option value="${o}">${o}</option>`).join('');
-
         return `
-            <div class="view-header" style="display:flex; flex-direction:column; gap:20px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <div>
-                        <h1>${i18n.t('nav.wishlist')}</h1>
-                    </div>
-                    
-                    <div style="display:flex; gap:8px;">
-                        <button id="btn-analytics" class="btn-text glass-panel" style="padding:6px 12px; font-size:0.85rem;">📊 Insights</button>
-                        <button id="btn-budget-planner" class="btn-magic" style="padding:6px 12px; font-size:0.85rem;">💸 Plan</button>
-
-                        <div class="view-toggle btn-group">
-                            <div style="display:flex; background:rgba(0,0,0,0.05); border-radius:20px; padding:2px;">
-                                <button id="btn-view-grid" class="toggle-btn active" style="padding:6px 12px;" title="Grid View">⊞</button>
-                                <button id="btn-view-timeline" class="toggle-btn" style="padding:6px 12px;" title="Timeline View">📅</button>
-                                <button id="btn-view-gift" class="toggle-btn" style="padding:6px 12px;" title="Gift Mode">🎁</button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="filter-bar" style="display:flex; gap:8px; overflow-x:auto; padding:4px 0; align-items:center; scrollbar-width:none;">
-                    <div class="glass-panel" style="display:flex; align-items:center; padding:0 12px; height:36px; border-radius:20px; min-width:140px;">
-                        <span style="font-size:0.9rem; opacity:0.5; margin-right:6px;">🔍</span>
-                        <input type="text" id="search-input" placeholder="${i18n.t('ai.inputPlaceholder')}" 
-                            style="border:none; background:transparent; font-size:0.85rem; width:100%; outline:none; padding:0; color:var(--text-primary);">
-                    </div>
-                    <select id="sort-order" class="filter-chip" style="min-width: auto; padding-right:24px;">
-                        <option value="newest">🕒 Newest</option>
-                        <option value="oldest">🕒 Oldest</option>
-                        <option value="priority">🔥 Priority</option>
-                        <option value="price_high">💰 Price High</option>
-                        <option value="price_low">💰 Price Low</option>
-                        <option value="date_near">📅 Due Soon</option>
-                    </select>
-                    <select id="filter-category" class="filter-chip" style="min-width: auto; padding-right:24px;">${catOptions}</select>
-                    <select id="filter-occasion" class="filter-chip" style="min-width: auto; padding-right:24px;">
-                        <option value="All">🎉 Occasion</option>${occOptions}
-                    </select>
-                    <select id="filter-price" class="filter-chip" style="min-width: auto; padding-right:24px;">
-                        <option value="All">💵 Price</option>
-                        <option value="0-500">0 - 500</option>
-                        <option value="500-2000">500 - 2000</option>
-                        <option value="2000+">2000+</option>
-                    </select>
-                    <button id="btn-archive-toggle" class="filter-chip">📦 Archived</button>
-                    <button id="btn-sale-filter" class="filter-chip">% Sale</button>
-                </div>
+            <div class="view-header">
+                <h1>${i18n.t('nav.wishlist')}</h1>
             </div>
-            
-            <div id="content-area" style="flex:1; min-width:0; margin-top:24px;">
-                <div class="masonry-grid">${WishlistView.skeletonTemplate.repeat(4)}</div>
+
+            <!-- Occasion Filter Bar -->
+            <div id="occasion-filters" class="filter-scroll-container">
+                <!-- Pills injected here -->
+                <div class="loading-spinner">Loading...</div>
             </div>
-            
-            <button class="fab-add" id="fab-add-wish" style="position:fixed; bottom:30px; right:30px; z-index:999;">
-                <span style="font-size:24px;">+</span>
+
+            <!-- Add Button (Prominent) -->
+            <button id="btn-add-wish-main" class="glass-panel" style="width:100%; padding:16px; margin-bottom:24px; display:flex; align-items:center; justify-content:center; gap:10px; color:var(--accent-color); font-weight:600; cursor:pointer; border:1px dashed var(--accent-color);">
+                <span style="font-size:1.2rem;">+</span> Add New Wish
             </button>
-
-            <div id="select-board-modal" class="modal-overlay" style="z-index: 1200;">
-                <div class="modal-content" style="max-width:350px;">
-                    <div class="modal-header"><h3>📌 Add to Board</h3><button class="close-btn close-select-board">&times;</button></div>
-                    <div id="board-list-simple" style="display:flex; flex-direction:column; gap:8px; max-height:300px; overflow-y:auto;"></div>
-                </div>
-            </div>
-
-            <div id="planner-modal" class="modal-overlay" style="z-index: 1200;">
-                <div class="modal-content">
-                    <div class="modal-header"><h3>💸 Smart Purchase Plan</h3><button class="close-btn" id="close-planner">&times;</button></div>
-                    <div style="margin-bottom:16px;">
-                        <label>What is your budget for this month?</label>
-                        <div style="display:flex; gap:8px; margin-top:8px;">
-                            <input type="number" id="planner-budget" placeholder="e.g. 5000" class="form-input" style="flex:1;">
-                            <select id="planner-currency" class="form-input" style="width:80px;">
-                                <option value="TRY">TRY</option>
-                                <option value="USD">USD</option>
-                                <option value="EUR">EUR</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button class="btn-primary" id="btn-run-planner" style="width:100%;">🔮 Generate Plan</button>
-                    
-                    <div id="planner-results" style="margin-top:20px; display:none;">
-                        <div style="background:rgba(0,0,0,0.03); padding:12px; border-radius:8px; font-size:0.9rem; margin-bottom:12px;" id="planner-summary"></div>
-                        <div id="planner-items-list" style="display:flex; flex-direction:column; gap:8px; max-height:250px; overflow-y:auto;"></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="analytics-modal" class="modal-overlay" style="z-index: 1200;">
-                <div class="modal-content">
-                    <div class="modal-header"><h3>📊 Wishlist Insights</h3><button class="close-btn" id="close-analytics">&times;</button></div>
-                    <div id="analytics-body" style="display:flex; flex-direction:column; gap:16px;">
-                        </div>
-                </div>
+            
+            <!-- Main Grid -->
+            <div id="wishlist-grid" class="masonry-grid">
+                <!-- Cards injected here -->
             </div>
         `;
     },
 
     afterRender: async () => {
-        if (!addItemModal) addItemModal = new AddItemModal(() => WishlistView.loadData());
-        
-        const fab = document.getElementById('fab-add-wish');
-        if (fab) fab.onclick = () => addItemModal.open();
+        const user = authService.currentUser;
+        if (!user) return;
 
-        const renderWithTransition = () => {
-            const grid = document.querySelector('.masonry-grid');
-            const giftMode = document.querySelector('.gift-mode-container');
-            
-            // Handle different container types
-            const target = grid || giftMode || document.getElementById('content-area');
-            
-            if (target) {
-                target.style.opacity = '0';
-                target.style.transform = 'translateY(10px)';
-                setTimeout(() => {
-                    WishlistView.renderContent();
-                    const newTarget = document.querySelector('.masonry-grid') || document.querySelector('.gift-mode-container');
-                    if (newTarget) {
-                        newTarget.style.opacity = '1';
-                        newTarget.style.transform = 'translateY(0)';
-                    }
-                }, 200);
-            } else {
-                WishlistView.renderContent();
-            }
-        };
+        if (!addItemModal) addItemModal = new AddItemModal(() => WishlistView.refresh());
 
-        const bindFilter = (id, key, type = 'value') => {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.addEventListener(type === 'click' ? 'click' : 'input', (e) => {
-                if (type === 'click') {
-                    currentFilters[key] = !currentFilters[key];
-                    e.target.classList.toggle('active', currentFilters[key]);
-                } else {
-                    currentFilters[key] = e.target.value === 'All' ? 'All' : e.target.value;
-                }
-                renderWithTransition();
-            });
-        };
-
-        bindFilter('search-input', 'search');
-        bindFilter('filter-category', 'category');
-        bindFilter('filter-price', 'priceRange');
-        bindFilter('sort-order', 'sortOrder');
-        bindFilter('btn-sale-filter', 'saleOnly', 'click');
-
-        const occSelect = document.getElementById('filter-occasion');
-        if (occSelect) occSelect.onchange = (e) => { currentFilters.occasion = e.target.value; renderWithTransition(); };
-
-        const btnArchive = document.getElementById('btn-archive-toggle');
-        if (btnArchive) {
-            btnArchive.onclick = () => {
-                if (currentFilters.status === 'wish') {
-                    currentFilters.status = 'archived';
-                    btnArchive.classList.add('active');
-                    btnArchive.textContent = 'Active Wishes';
-                } else {
-                    currentFilters.status = 'wish';
-                    btnArchive.classList.remove('active');
-                    btnArchive.textContent = '📦 Archived';
-                }
-                renderWithTransition();
-            };
-        }
-
-        const setView = (mode) => {
-            currentFilters.viewMode = mode;
-            ['grid', 'timeline', 'gift'].forEach(m => {
-                const btn = document.getElementById(`btn-view-${m}`);
-                if (btn) btn.classList.toggle('active', mode === m);
-            });
-            renderWithTransition();
-        };
-        document.getElementById('btn-view-grid').onclick = () => setView('grid');
-        document.getElementById('btn-view-timeline').onclick = () => setView('timeline');
-        document.getElementById('btn-view-gift').onclick = () => setView('gift');
-
-        // Modal Logic
-        const setupModal = (triggerId, modalId, closeId) => {
-            const btn = document.getElementById(triggerId);
-            const modal = document.getElementById(modalId);
-            const close = document.getElementById(closeId);
-            if (btn) btn.onclick = () => { modal.style.display = 'flex'; requestAnimationFrame(() => modal.classList.add('active')); };
-            if (close) close.onclick = () => { modal.classList.remove('active'); setTimeout(() => modal.style.display = 'none', 300); };
-        };
-
-        setupModal('btn-budget-planner', 'planner-modal', 'close-planner');
-        setupModal('btn-analytics', 'analytics-modal', 'close-analytics');
-
-        // Analytics Render Logic
-        document.getElementById('btn-analytics').addEventListener('click', () => {
-            const items = Array.from(itemsMap.values()).filter(i => !i.deleted && i.status === 'wish');
-            const totalValue = items.reduce((sum, i) => sum + (i.price || 0), 0);
-            const weeklySavings = items.reduce((sum, i) => {
-                const insight = getSavingInsight(i.price, i.targetDate);
-                return sum + (insight ? insight.weeklySaving : 0);
-            }, 0);
-            
-            // Simple Category Dist
-            const catCounts = {};
-            items.forEach(i => catCounts[i.category] = (catCounts[i.category] || 0) + 1);
-            const topCat = Object.entries(catCounts).sort((a,b) => b[1]-a[1])[0] || ['None', 0];
-
-            const body = document.getElementById('analytics-body');
-            body.innerHTML = `
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                    <div class="glass-panel" style="padding:16px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:700; color:var(--accent-color);">${totalValue.toLocaleString()}</div>
-                        <div style="font-size:0.7rem; color:var(--text-tertiary);">Total Value (est)</div>
-                    </div>
-                    <div class="glass-panel" style="padding:16px; text-align:center;">
-                        <div style="font-size:1.5rem; font-weight:700; color:#34C759;">${weeklySavings.toLocaleString()}</div>
-                        <div style="font-size:0.7rem; color:var(--text-tertiary);">Weekly Saving Goal</div>
-                    </div>
-                </div>
-                <div class="glass-panel" style="padding:16px;">
-                    <h4 style="margin:0 0 12px 0;">Category Focus</h4>
-                    <div style="display:flex; align-items:center; justify-content:space-between;">
-                        <span>Most wished: <b>${topCat[0]}</b></span>
-                        <span class="tag">${topCat[1]} items</span>
-                    </div>
-                    <div style="margin-top:12px; height:8px; background:#eee; border-radius:4px; overflow:hidden;">
-                        <div style="height:100%; width:${(topCat[1]/items.length)*100}%; background:var(--accent-color);"></div>
-                    </div>
-                </div>
-            `;
-        });
-
-        // Board Select Logic
-        const boardModal = document.getElementById('select-board-modal');
-        document.querySelector('.close-select-board').onclick = () => {
-            boardModal.classList.remove('active');
-            setTimeout(() => boardModal.style.display = 'none', 300);
-        };
-
-        window.openBoardSelect = async (itemId, imageUrl) => {
-            boardModal.style.display = 'flex';
-            requestAnimationFrame(() => boardModal.classList.add('active'));
-            const list = document.getElementById('board-list-simple');
-            list.innerHTML = `<div class="loading-spinner">Loading...</div>`;
-            try {
-                const user = authService.currentUser;
-                const boards = await firestoreService.getBoards(user.uid);
-                if (boards.length === 0) {
-                    list.innerHTML = `<p style="text-align:center; color:#999;">No boards yet.</p>`;
-                    return;
-                }
-                list.innerHTML = boards.map(b => `
-                    <div class="glass-panel" style="padding:12px; cursor:pointer; display:flex; align-items:center; gap:12px;" onclick="window.saveToBoard('${b.id}', '${itemId}', '${imageUrl}')">
-                        <div style="width:40px; height:40px; border-radius:8px; background-image:url('${b.coverUrl}'); background-size:cover;"></div>
-                        <strong>${b.title}</strong>
-                    </div>
-                `).join('');
-            } catch (e) { list.innerHTML = "Error loading boards."; }
-        };
-
-        window.saveToBoard = async (boardId, refId, imageUrl) => {
-            document.getElementById('select-board-modal').classList.remove('active');
-            setTimeout(() => document.getElementById('select-board-modal').style.display = 'none', 300);
-            await firestoreService.addPin(boardId, { imageUrl, refId });
-            window.showToast("Saved to board!", "📌");
-        };
-
-        // Planner Run Logic (reused)
-        const btnRun = document.getElementById('btn-run-planner');
-        if(btnRun) btnRun.onclick = async () => {
-            const budget = parseFloat(document.getElementById('planner-budget').value);
-            const currency = document.getElementById('planner-currency').value;
-            
-            if(!budget || budget <= 0) return alert("Enter a valid budget.");
-
-            btnRun.disabled = true;
-            btnRun.innerHTML = 'Thinking...';
-            document.getElementById('planner-results').style.display = 'none';
-
-            try {
-                const allItems = Array.from(itemsMap.values()).filter(i => i.status === 'wish');
-                const plan = await aiService.getPurchasePlan(allItems, budget, currency);
-                
-                if(plan && plan.recommendedItems) {
-                    document.getElementById('planner-results').style.display = 'block';
-                    document.getElementById('planner-summary').innerText = plan.summary || "Here is your plan:";
-                    
-                    const list = document.getElementById('planner-items-list');
-                    list.innerHTML = plan.recommendedItems.map(rec => {
-                        const item = itemsMap.get(rec.itemId);
-                        if(!item) return '';
-                        return `
-                            <div class="glass-panel" style="padding:10px; display:flex; gap:10px; align-items:center;">
-                                <img src="${item.imageUrl}" style="width:40px; height:40px; border-radius:4px; object-fit:cover;">
-                                <div style="flex:1;">
-                                    <div style="font-weight:600; font-size:0.9rem;">${item.title}</div>
-                                    <div style="font-size:0.8rem; color:var(--text-secondary);">${item.price} ${item.currency}</div>
-                                </div>
-                                <div style="font-size:1.2rem; color:#34C759;">✓</div>
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    alert("AI couldn't generate a plan.");
-                }
-            } catch(e) {
-                console.error(e);
-                alert("AI Service Error");
-            } finally {
-                btnRun.disabled = false;
-                btnRun.innerHTML = '🔮 Generate Plan';
-            }
-        };
+        // Bind Main Add Button
+        document.getElementById('btn-add-wish-main').onclick = () => addItemModal.open();
 
         await WishlistView.loadData();
     },
 
     loadData: async () => {
-        const container = document.getElementById('content-area');
-        if (!container) return;
-
         const user = authService.currentUser;
-        if (!user) { container.innerHTML = `<div class="empty-state">Login required.</div>`; return; }
-
         try {
             const items = await firestoreService.getWishlist(user.uid, user.uid);
+            // Filter out bought items (they go to closet) and deleted ones
+            const wishes = items.filter(i => i.status === 'wish' && !i.deleted);
+            
             itemsMap.clear();
-            items.forEach(item => itemsMap.set(item.id, item));
+            wishes.forEach(i => itemsMap.set(i.id, i));
 
-            GamificationService.checkMilestones('add_item', items.length);
-            WishlistView.renderContent();
-        } catch (error) {
-            console.error(error);
-            container.innerHTML = `<div class="empty-state">${i18n.t('common.error')} <button class="btn-text" onclick="WishlistView.loadData()">Retry</button></div>`;
+            WishlistView.renderFilters(wishes);
+            WishlistView.renderGrid(wishes);
+
+        } catch (e) {
+            console.error(e);
         }
     },
 
-    renderContent: () => {
-        const container = document.getElementById('content-area');
-        if (!container) return;
+    renderFilters: (wishes) => {
+        const container = document.getElementById('occasion-filters');
+        if(!container) return;
 
-        let displayItems = Array.from(itemsMap.values());
+        // Extract unique occasions. Null/Empty = "Main List"
+        const occasions = new Set(['All', 'Main']);
+        wishes.forEach(i => {
+            if(i.occasion) occasions.add(i.occasion);
+        });
+
+        container.innerHTML = Array.from(occasions).map(occ => {
+            const isActive = currentFilter.occasion === occ ? 'active' : '';
+            const label = occ === 'Main' ? 'General' : occ;
+            return `<button class="occasion-pill ${isActive}" data-val="${occ}">${label}</button>`;
+        }).join('');
+
+        // Bind clicks
+        container.querySelectorAll('.occasion-pill').forEach(btn => {
+            btn.onclick = () => {
+                currentFilter.occasion = btn.dataset.val;
+                WishlistView.renderFilters(wishes); // Re-render pills to update active state
+                WishlistView.renderGrid(wishes); // Filter grid
+            };
+        });
+    },
+
+    renderGrid: (allWishes) => {
+        const container = document.getElementById('wishlist-grid');
+        if(!container) return;
 
         // Filter Logic
-        displayItems = displayItems.filter(item => {
-            if (currentFilters.status === 'archived') return item.status === 'archived';
-            if (currentFilters.viewMode === 'gift') return item.status === 'wish' && item.occasion;
-            return item.status === 'wish';
+        const filtered = allWishes.filter(item => {
+            if (currentFilter.occasion === 'All') return true;
+            if (currentFilter.occasion === 'Main') return !item.occasion; // Empty occasion
+            return item.occasion === currentFilter.occasion;
         });
 
-        if (currentFilters.saleOnly) displayItems = displayItems.filter(item => item.onSale);
-        if (currentFilters.category !== 'All') displayItems = displayItems.filter(item => item.category === currentFilters.category);
-        if (currentFilters.occasion !== 'All') displayItems = displayItems.filter(item => item.occasion === currentFilters.occasion);
-        
-        // Price Filter Logic
-        if (currentFilters.priceRange !== 'All') {
-            displayItems = displayItems.filter(item => {
-                const p = item.price || 0;
-                if (currentFilters.priceRange === '0-500') return p <= 500;
-                if (currentFilters.priceRange === '500-2000') return p > 500 && p <= 2000;
-                if (currentFilters.priceRange === '2000+') return p > 2000;
-                return true;
-            });
-        }
-
-        if (currentFilters.search) {
-            const term = currentFilters.search.toLowerCase();
-            displayItems = displayItems.filter(item =>
-                (item.title && item.title.toLowerCase().includes(term)) ||
-                (item.category && item.category.toLowerCase().includes(term))
-            );
-        }
-
-        // Sort Logic
-        displayItems.sort((a, b) => {
-            switch (currentFilters.sortOrder) {
-                case 'oldest': return (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0);
-                case 'priority': 
-                    const pMap = { 'High': 3, 'Medium': 2, 'Low': 1 }; 
-                    return (pMap[b.priority] || 2) - (pMap[a.priority] || 2);
-                case 'price_high': return (b.price || 0) - (a.price || 0);
-                case 'price_low': return (a.price || 0) - (b.price || 0);
-                case 'date_near': 
-                    if (!a.targetDate) return 1; 
-                    if (!b.targetDate) return -1; 
-                    return new Date(a.targetDate) - new Date(b.targetDate);
-                case 'newest': 
-                default: 
-                    return (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0);
-            }
-        });
-
-        if (displayItems.length === 0) {
-            container.innerHTML = `<div class="empty-state"><p>No matches found.</p></div>`;
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state" style="grid-column:1/-1; padding:40px 0;">
+                    <div style="font-size:3rem; opacity:0.5; margin-bottom:12px;">🍃</div>
+                    <h3>Nothing here yet</h3>
+                    <p>This list is waiting for your dreams.</p>
+                </div>
+            `;
             return;
         }
 
-        if (currentFilters.viewMode === 'timeline') {
-            WishlistView.renderTimeline(container, displayItems);
-        } else if (currentFilters.viewMode === 'gift') {
-            WishlistView.renderGiftMode(container, displayItems);
-        } else {
-            const gridHtml = displayItems.map(item => WishlistView.renderCard(item)).join('');
-            container.innerHTML = `<div class="masonry-grid">${gridHtml}</div>`;
-            WishlistView.bindCardEvents(container);
-        }
-    },
-
-    renderTimeline: (container, items) => {
-        const datedItems = items.filter(i => i.targetDate).sort((a, b) => new Date(a.targetDate) - new Date(b.targetDate));
-        const undatedItems = items.filter(i => !i.targetDate);
-
-        let html = `<div class="timeline-container">`;
-        let currentMonth = '';
-        datedItems.forEach(item => {
-            const date = new Date(item.targetDate);
-            const monthStr = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-            if (monthStr !== currentMonth) {
-                if (currentMonth !== '') html += `</div>`;
-                currentMonth = monthStr;
-                html += `<div class="timeline-group"><div class="timeline-header">${currentMonth}</div>`;
+        container.innerHTML = filtered.map(item => {
+            // Calculation for display
+            let savingHint = '';
+            if (item.targetDate && item.price > 0) {
+                const target = new Date(item.targetDate);
+                const weeks = Math.max(1, Math.ceil((target - new Date()) / (1000 * 60 * 60 * 24 * 7)));
+                const amount = Math.ceil(item.price / weeks);
+                savingHint = `<div style="margin-top:8px; font-size:0.75rem; color:var(--accent-color); font-weight:600; background:rgba(99,102,241,0.05); padding:4px 8px; border-radius:8px; display:inline-block;">
+                    🎯 Save ${amount} ${item.currency}/wk
+                </div>`;
             }
-            const day = date.getDate();
-            html += `
-                <div class="timeline-item glass-panel" style="display:flex; align-items:center; padding:16px; gap:16px;">
-                    <div style="background:rgba(0,0,0,0.05); padding:8px 12px; border-radius:12px; text-align:center; min-width:60px;">
-                        <span style="font-size:1.2rem; font-weight:700; display:block;">${day}</span>
-                        <span style="font-size:0.7rem; text-transform:uppercase;">Due</span>
+
+            return `
+                <article class="glass-panel card" data-id="${item.id}">
+                    <div class="card-img-container">
+                        <img src="${item.imageUrl}" class="card-img" onerror="this.src='https://placehold.co/400x300'">
+                        <div style="position:absolute; top:8px; right:8px; display:flex; gap:4px;">
+                            <span class="tag" style="background:rgba(255,255,255,0.9); backdrop-filter:blur(4px);">${item.priority}</span>
+                        </div>
                     </div>
-                    <img src="${item.imageUrl}" style="width:60px; height:60px; border-radius:12px; object-fit:cover;">
-                    <div style="flex:1;">
-                        <h4 style="margin:0;">${item.title}</h4>
-                        <div style="font-size:0.85rem; color:var(--text-secondary);">${item.price} ${item.currency}</div>
+                    <div class="card-content" style="padding:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:4px;">
+                            <h3 style="margin:0; font-size:1rem; line-height:1.3;">${item.title}</h3>
+                        </div>
+                        <div style="color:var(--text-secondary); font-size:0.9rem;">${item.price} ${item.currency}</div>
+                        ${savingHint}
+                        
+                        <div class="card-actions-row" style="margin-top:16px; display:flex; justify-content:space-between; align-items:center;">
+                            <button class="btn-text btn-edit" style="font-size:0.8rem;">Edit</button>
+                            <div style="display:flex; gap:8px;">
+                                <button class="icon-btn btn-delete" style="color:#ff3b30; font-size:1rem;" title="Delete">🗑</button>
+                                <button class="icon-btn btn-complete" style="color:#34C759; background:rgba(52,199,89,0.1); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center;" title="Manifested!">✔</button>
+                            </div>
+                        </div>
                     </div>
-                    <button class="btn-text edit-btn" data-id="${item.id}" style="font-size:1.2rem;">✎</button>
-                </div>
+                </article>
             `;
+        }).join('');
+
+        // Bind Actions
+        container.querySelectorAll('.btn-edit').forEach(b => b.onclick = (e) => {
+            const id = b.closest('.card').dataset.id;
+            addItemModal.open(itemsMap.get(id));
         });
 
-        if (datedItems.length > 0) html += `</div>`;
-        if (undatedItems.length > 0) {
-            html += `<div class="timeline-group"><div class="timeline-header">Someday</div>`;
-            undatedItems.forEach(item => {
-                html += `
-                    <div class="timeline-item glass-panel" style="display:flex; align-items:center; padding:16px; gap:16px; opacity:0.8;">
-                        <div style="width:60px; text-align:center; font-size:1.5rem;">∞</div>
-                        <img src="${item.imageUrl}" style="width:50px; height:50px; border-radius:12px; object-fit:cover;">
-                        <div style="flex:1;"><h4 style="margin:0;">${item.title}</h4></div>
-                        <button class="btn-text edit-btn" data-id="${item.id}">✎</button>
-                    </div>
-                `;
-            });
-            html += `</div>`;
-        }
-        html += `</div>`;
-        container.innerHTML = html;
-        WishlistView.bindCardEvents(container);
+        container.querySelectorAll('.btn-delete').forEach(b => b.onclick = (e) => {
+            const id = b.closest('.card').dataset.id;
+            if(confirm("Delete this wish?")) {
+                firestoreService.deleteItem(id).then(() => WishlistView.refresh());
+            }
+        });
+
+        container.querySelectorAll('.btn-complete').forEach(b => b.onclick = (e) => {
+            const id = b.closest('.card').dataset.id;
+            if(confirm("Mark as bought and move to Closet?")) {
+                firestoreService.markAsOwned(id).then(() => {
+                    window.showToast("Moved to Closet!", "🎉");
+                    WishlistView.refresh();
+                });
+            }
+        });
     },
 
-    renderGiftMode: (container, items) => {
-        const groups = {};
-        items.forEach(i => {
-            const occ = i.occasion || "Other";
-            if (!groups[occ]) groups[occ] = [];
-            groups[occ].push(i);
-        });
-
-        let html = `<div class="gift-mode-container" style="padding-bottom:100px; display:flex; flex-direction:column; gap:24px;">`;
-        Object.keys(groups).forEach(occ => {
-            html += `
-                <div class="gift-group">
-                    <div class="gift-mode-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h3 style="margin:0; font-size:1.2rem;">🎁 ${occ}</h3>
-                        <span class="tag">${groups[occ].length} wishes</span>
-                    </div>
-                    <div class="scroll-row" style="display:flex; overflow-x:auto; gap:16px; padding-bottom:12px;">
-                        ${groups[occ].map(item => WishlistView.renderCard(item, 'gift')).join('')}
-                    </div>
-                </div>
-            `;
-        });
-        html += `</div>`;
-        container.innerHTML = html;
-        WishlistView.bindCardEvents(container);
-    },
-
-    renderCard: (item, context = 'grid') => {
-        const isGift = context === 'gift';
-        const giftClass = item.occasion ? 'card-gift' : '';
-        const priorityClass = item.priority === 'High' ? 'card-priority-high' : '';
-        const timeData = getCountdown(item.targetDate);
-        const financialData = getSavingInsight(item.price, item.targetDate);
-
-        let badges = '';
-        if (timeData) badges += `<span class="time-tag ${timeData.class}">⏳ ${timeData.text}</span>`;
-        if (item.visibility === 'private') badges += `<span class="time-tag tag-far" style="margin-left:4px;">🔒</span>`;
-        if (item.occasion && !isGift) badges += `<span class="time-tag tag-far" style="margin-left:4px;">🎉 ${item.occasion}</span>`;
-
-        let financialBadge = '';
-        if (financialData && item.status === 'wish') {
-            financialBadge = `<div style="margin-top:6px; font-size:0.75rem; color:var(--accent-color); font-weight:600;">
-                💡 Save ${financialData.weeklySaving} ${item.currency}/wk
-            </div>`;
-        }
-
-        return `
-            <article class="glass-panel card ${item.isOwned ? 'card-owned' : ''} ${giftClass} ${priorityClass}" data-id="${item.id}" 
-                style="${isGift ? 'min-width:200px; display:inline-block;' : ''}">
-                
-                <div class="card-actions" style="position:absolute; top:10px; right:10px; z-index:10; display:flex; gap:4px;">
-                    <button class="card-action-btn edit-btn" style="position:static; opacity:1;">✎</button>
-                    <button class="card-action-btn delete-btn" style="position:static; opacity:1; color:#ff3b30;">&times;</button>
-                </div>
-                <button class="card-action-btn pin-btn" style="position:absolute; top:10px; left:10px; z-index:10; opacity:1; color:#007AFF;" title="Add to Board">📌</button>
-                
-                ${!item.isOwned && item.status === 'wish' ? 
-                    `<button class="card-action-btn closet-btn" style="position:absolute; top:50px; left:10px; z-index:10; opacity:1; color:#34C759;" title="Manifest!">✔</button>` 
-                    : ''}
-                
-                <div class="card-img-container">
-                    <img src="${item.imageUrl}" class="card-img" onerror="this.src='https://placehold.co/600x400'">
-                </div>
-                <div class="card-content">
-                    <h3>${item.title}</h3>
-                    <div style="margin-bottom:8px; display:flex; flex-wrap:wrap; gap:4px;">${badges}</div>
-                    <div class="card-meta">
-                        <span class="tag">${item.category}</span>
-                        <span class="price">${item.price} ${item.currency}</span>
-                    </div>
-                    ${financialBadge}
-                </div>
-            </article>
-        `;
-    },
-
-    bindCardEvents: (container) => {
-        container.querySelectorAll('.delete-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                const id = btn.closest('.card').dataset.id;
-                window.handleDeleteItem(id);
-            };
-        });
-        container.querySelectorAll('.edit-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                const id = btn.closest('.card').dataset.id;
-                window.handleEditItem(id);
-            };
-        });
-        container.querySelectorAll('.closet-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                const id = btn.closest('.card').dataset.id;
-                window.handleMoveToCloset(id);
-            };
-        });
-        container.querySelectorAll('.pin-btn').forEach(btn => {
-            btn.onclick = (e) => {
-                e.stopPropagation();
-                const card = btn.closest('.card');
-                window.openBoardSelect(card.dataset.id, card.querySelector('img').src);
-            };
-        });
-    }
-};
-
-// Global Handlers (Existing)
-window.handleDeleteItem = async (id) => {
-    if (confirm(i18n.t('common.confirm') || "Delete this item?")) {
-        try {
-            await firestoreService.deleteItem(id);
-            WishlistView.loadData();
-            window.showToast("Item archived.", "📦");
-        } catch(e) { console.error(e); }
-    }
-};
-window.handleEditItem = async (id) => {
-    const item = itemsMap.get(id);
-    if (item && addItemModal) addItemModal.open(item);
-};
-window.handleMoveToCloset = async (id) => {
-    if (confirm("Mark as bought and move to Closet?")) {
-        try {
-            await firestoreService.markAsOwned(id);
-            window.showToast("Manifested!", "🎉");
-            GamificationService.triggerConfetti();
-            WishlistView.loadData();
-        } catch(e) { console.error(e); }
+    refresh: async () => {
+        // Re-fetch and re-render
+        await WishlistView.loadData();
     }
 };

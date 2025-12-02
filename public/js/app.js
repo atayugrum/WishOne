@@ -1,5 +1,5 @@
 /* public/js/app.js */
-import { router } from './utils/Router.js'; // Import the singleton instance
+import { router } from './utils/Router.js';
 import { AppShell } from './views/AppShell.js';
 import { HomeView } from './views/HomeView.js';
 import { WishlistView } from './views/WishlistView.js';
@@ -11,6 +11,7 @@ import { ComboView } from './views/ComboView.js';
 import { FriendsView } from './views/FriendsView.js';
 import { ProfileView } from './views/ProfileView.js';
 import { SettingsView } from './views/SettingsView.js';
+import { AuthView } from './views/AuthView.js'; // [NEW] Import AuthView
 import { authService } from './services/AuthService.js';
 import { settingsService } from './services/SettingsService.js';
 import { LogService } from './services/LogService.js';
@@ -20,11 +21,12 @@ import './utils/Toast.js';
 // Define Routes Map
 const routes = {
     '/': LandingView,
+    '/auth': AuthView, // [NEW] Auth Route
     '/onboarding': OnboardingView,
 
     // Authenticated Routes (Wrapped in Shell)
     '/app/home': {
-        render: () => AppShell.render(), // Shell renders itself, views inject content
+        render: () => AppShell.render(),
         afterRender: async () => {
             await AppShell.afterRender();
             const content = document.getElementById('shell-content');
@@ -119,26 +121,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     LogService.info('App Started');
     await settingsService.init();
 
-    if ('serviceWorker' in navigator) {
-        // navigator.serviceWorker.register('/sw.js'); // Optional: Uncomment if SW is ready
-    }
-
-    // Configure the singleton router
+    // Configure router
     router.setRoutes(routes);
 
     const routeGuard = (path) => {
         const user = authService.currentUser;
-        const profile = authService.userProfile; // Assumes Auth service caches this
+        const profile = authService.userProfile;
 
-        const isPublic = path === '/' || path.startsWith('/share');
+        // Public routes
+        const isPublic = path === '/' || path === '/auth' || path.startsWith('/share');
         
-        if (!user && !isPublic) return '/'; // Redirect to landing if not logged in
+        // Redirect logic
+        if (!user && !isPublic) return '/';
         
         if (user) {
             if (path !== '/onboarding') {
                 if (profile && !profile.hasCompletedSignupProfile) return '/onboarding';
             }
-            if (path === '/') return '/app/home'; // Redirect to app if logged in
+            // If user is on landing or auth, go to home
+            if (path === '/' || path === '/auth') return '/app/home';
         }
         return null; // OK
     };
@@ -150,6 +151,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
         router.setGuard((path) => routeGuard(path));
-        router.handleLocation(); // Trigger initial route
+        router.handleLocation();
     });
 });

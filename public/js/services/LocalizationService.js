@@ -10,10 +10,16 @@ class LocalizationService {
 
     setLocale(lang) {
         if (!this.dictionary[lang]) return;
+        
+        // [CRITICAL FIX] Prevent infinite reload loop
+        // If the requested language is ALREADY the current language, do nothing.
+        if (this.locale === lang) return;
+
         this.locale = lang;
         localStorage.setItem('wishone_locale', lang);
         this.notifyListeners();
-        // Reload to apply changes across all rendered views instantly
+        
+        // Only reload if we actually changed the language
         window.location.reload(); 
     }
 
@@ -21,9 +27,16 @@ class LocalizationService {
         const keys = key.split('.');
         let current = this.dictionary[this.locale];
         
+        // Fallback to English dictionary if current language is missing keys
+        // (Optional safety, assuming English is base)
+        if (!current && this.locale !== 'en') {
+            current = this.dictionary['en'];
+        }
+        if (!current) return key;
+
         for (const k of keys) {
             if (current[k] === undefined) {
-                console.warn(`Missing translation: ${key} (${this.locale})`);
+                // console.warn(`Missing translation: ${key} (${this.locale})`);
                 return key;
             }
             current = current[k];
@@ -37,6 +50,15 @@ class LocalizationService {
 
     notifyListeners() {
         this.listeners.forEach(cb => cb(this.locale));
+    }
+
+    get lang() {
+        return this.locale;
+    }
+
+    toggle() {
+        const newLang = this.locale === 'en' ? 'tr' : 'en';
+        this.setLocale(newLang);
     }
 }
 
